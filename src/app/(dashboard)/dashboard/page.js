@@ -17,15 +17,10 @@ import {
 } from '@mui/material';
 import {
   Add as AddIcon,
-  FolderOpen,
-  CheckCircle,
   Search,
   ChevronLeft,
   ChevronRight,
-  TrendingUp,
   Assignment,
-  CheckCircleOutline,
-  Schedule,
 } from '@mui/icons-material';
 
 export default function DashboardPage() {
@@ -89,32 +84,18 @@ export default function DashboardPage() {
 
   const quickActions = [
     {
-      title: 'Crear Nuevo Item',
-      description: 'Agregar un nuevo elemento al inventario',
+      title: 'Crear Activo',
+      description: 'Agregar un nuevo activo al inventario',
       icon: <AddIcon sx={{ fontSize: 40 }} />,
       color: '#1976d2',
-      path: '/create-pic',
+      path: '/crear-activo',
     },
     {
-      title: 'Mis Items',
-      description: 'Ver y gestionar mis items creados',
-      icon: <FolderOpen sx={{ fontSize: 40 }} />,
-      color: '#2e7d32',
-      path: '/my-pics',
-    },
-    {
-      title: 'Aprobar / Rechazar',
-      description: 'Revisar items pendientes',
-      icon: <CheckCircle sx={{ fontSize: 40 }} />,
-      color: '#ed6c02',
-      path: '/approve-reject',
-    },
-    {
-      title: 'Consultar Items',
-      description: 'Buscar y consultar todos los items',
+      title: 'Buscar Activos',
+      description: 'Buscar y consultar todos los activos',
       icon: <Search sx={{ fontSize: 40 }} />,
-      color: '#9c27b0',
-      path: '/query-pics',
+      color: '#2e7d32',
+      path: '/buscar-activos',
     },
   ];
 
