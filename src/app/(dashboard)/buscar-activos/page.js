@@ -121,6 +121,7 @@ export default function BuscarActivosPage() {
 
   useEffect(() => {
     applyFilters();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, activos]);
 
   const fetchData = async () => {
@@ -962,7 +963,7 @@ export default function BuscarActivosPage() {
             <strong>{activoToDelete?.numeroEtiqueta}</strong>?
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            El activo será marcado como "baja" con la fecha de hoy y no aparecerá en las búsquedas activas.
+            El activo será marcado como &quot;baja&quot; con la fecha de hoy y no aparecerá en las búsquedas activas.
           </Typography>
           <Typography variant="body2" sx={{ mt: 2 }}>
             Usuario: <strong>{currentUser?.emp_alias || currentUser?.username || 'N/A'}</strong>
