@@ -55,18 +55,24 @@ export default function EditarActivoPage() {
     nacionalExtranjero: '',
     numeroPedimento: '',
     fechaAlta: '',
+    numeroCapex: '',
+    ordenInterna: '',
+    observaciones: '',
+    statusCipFa: '',
   });
 
   // New files to upload
   const [newPictures, setNewPictures] = useState([]);
   const [newPedimento, setNewPedimento] = useState(null);
   const [newFactura, setNewFactura] = useState(null);
+  const [newFormatoAlta, setNewFormatoAlta] = useState(null);
 
   // Existing files from server
   const [existingFiles, setExistingFiles] = useState({
     pictures: [],
     pedimento: null,
     factura: null,
+    formatoAlta: null,
   });
 
   // Files marked for deletion
@@ -74,6 +80,7 @@ export default function EditarActivoPage() {
     pictures: [],
     pedimento: false,
     factura: false,
+    formatoAlta: false,
   });
 
   // Dropdown data from database
@@ -149,6 +156,13 @@ export default function EditarActivoPage() {
 
         const asset = assetData.data;
 
+        // Check if asset is "baja" - cannot edit
+        if (asset.status === 'baja') {
+          setError('No se puede editar un activo dado de baja. Este activo fue dado de baja y no puede ser modificado.');
+          setLoading(false);
+          return;
+        }
+
         // Format date for input
         let fechaAlta = '';
         if (asset.fechaAlta) {
@@ -168,6 +182,10 @@ export default function EditarActivoPage() {
           nacionalExtranjero: asset.nacionalExtranjero || '',
           numeroPedimento: asset.numeroPedimento || '',
           fechaAlta: fechaAlta,
+          numeroCapex: asset.numeroCapex || '',
+          ordenInterna: asset.ordenInterna || '',
+          observaciones: asset.observaciones || '',
+          statusCipFa: asset.statusCipFa || '',
         });
 
         // Fetch files
@@ -274,6 +292,29 @@ export default function EditarActivoPage() {
     setDeletedFiles(prev => ({ ...prev, factura: false }));
   };
 
+  // Formato de Alta handling
+  const handleNewFormatoAltaChange = (event) => {
+    const file = event.target.files[0];
+    if (file && file.type === 'application/pdf') {
+      setNewFormatoAlta(file);
+    } else {
+      setError('Por favor seleccione un archivo PDF');
+    }
+    event.target.value = '';
+  };
+
+  const handleRemoveNewFormatoAlta = () => {
+    setNewFormatoAlta(null);
+  };
+
+  const handleDeleteExistingFormatoAlta = () => {
+    setDeletedFiles(prev => ({ ...prev, formatoAlta: true }));
+  };
+
+  const handleRestoreExistingFormatoAlta = () => {
+    setDeletedFiles(prev => ({ ...prev, formatoAlta: false }));
+  };
+
   // File viewer
   const openFileViewer = (url, type, title) => {
     setFileViewerUrl(url);
@@ -310,6 +351,10 @@ export default function EditarActivoPage() {
           planta_id: formData.planta,
           nacionalExtranjero: formData.nacionalExtranjero,
           numeroPedimento: formData.numeroPedimento,
+          numeroCapex: formData.numeroCapex,
+          ordenInterna: formData.ordenInterna,
+          observaciones: formData.observaciones,
+          statusCipFa: formData.statusCipFa,
         }),
       });
 
@@ -322,7 +367,7 @@ export default function EditarActivoPage() {
       }
 
       // Upload new files if any
-      if (newPictures.length > 0 || newPedimento || newFactura) {
+      if (newPictures.length > 0 || newPedimento || newFactura || newFormatoAlta) {
         const uploadData = new FormData();
         uploadData.append('assetId', assetId);
         uploadData.append('numeroEtiqueta', formData.numeroEtiqueta);
@@ -339,6 +384,10 @@ export default function EditarActivoPage() {
           uploadData.append('factura', newFactura);
         }
 
+        if (newFormatoAlta) {
+          uploadData.append('formatoAlta', newFormatoAlta);
+        }
+
         // Upload files
         await fetch(`/api/activos/${assetId}/upload`, {
           method: 'POST',
@@ -347,7 +396,7 @@ export default function EditarActivoPage() {
       }
 
       // Delete files marked for deletion
-      if (deletedFiles.pictures.length > 0 || deletedFiles.pedimento || deletedFiles.factura) {
+      if (deletedFiles.pictures.length > 0 || deletedFiles.pedimento || deletedFiles.factura || deletedFiles.formatoAlta) {
         await fetch(`/api/activos/${assetId}/files`, {
           method: 'DELETE',
           headers: {
@@ -359,6 +408,9 @@ export default function EditarActivoPage() {
 
       setSuccess(true);
       setSaving(false);
+      
+      // Scroll to top to show success message
+      window.scrollTo({ top: 0, behavior: 'smooth' });
 
       // Refresh files
       const filesRes = await fetch(`/api/activos/${assetId}/files`);
@@ -371,7 +423,8 @@ export default function EditarActivoPage() {
       setNewPictures([]);
       setNewPedimento(null);
       setNewFactura(null);
-      setDeletedFiles({ pictures: [], pedimento: false, factura: false });
+      setNewFormatoAlta(null);
+      setDeletedFiles({ pictures: [], pedimento: false, factura: false, formatoAlta: false });
 
     } catch (err) {
       console.error('Error updating asset:', err);
@@ -564,9 +617,9 @@ export default function EditarActivoPage() {
                   value={formData.numeroPedimento}
                   onChange={handleChange('numeroPedimento')}
                   variant="outlined"
-                  disabled={formData.nacionalExtranjero === 'nacional'}
+                  disabled={formData.nacionalExtranjero !== 'extranjero'}
                   helperText={
-                    formData.nacionalExtranjero === 'nacional'
+                    formData.nacionalExtranjero !== 'extranjero'
                       ? 'Solo aplica para activos extranjeros'
                       : ''
                   }
@@ -587,6 +640,60 @@ export default function EditarActivoPage() {
                   }}
                   disabled
                   helperText="La fecha de alta no se puede modificar"
+                />
+              </Grid>
+
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  required
+                  label="Número de Capex"
+                  name="numeroCapex"
+                  value={formData.numeroCapex}
+                  onChange={handleChange('numeroCapex')}
+                  variant="outlined"
+                />
+              </Grid>
+
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  required
+                  label="Orden Interna"
+                  name="ordenInterna"
+                  value={formData.ordenInterna}
+                  onChange={handleChange('ordenInterna')}
+                  variant="outlined"
+                />
+              </Grid>
+
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  required
+                  select
+                  label="Status CIP/FA"
+                  name="statusCipFa"
+                  value={formData.statusCipFa}
+                  onChange={handleChange('statusCipFa')}
+                  variant="outlined"
+                >
+                  <MenuItem value="">Seleccione una opción</MenuItem>
+                  <MenuItem value="CIP">CIP</MenuItem>
+                  <MenuItem value="FA">FA</MenuItem>
+                </TextField>
+              </Grid>
+
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Observaciones"
+                  name="observaciones"
+                  value={formData.observaciones}
+                  onChange={handleChange('observaciones')}
+                  variant="outlined"
+                  multiline
+                  rows={3}
                 />
               </Grid>
             </Grid>
@@ -768,10 +875,15 @@ export default function EditarActivoPage() {
             <Divider sx={{ my: 4 }} />
 
             {/* Pedimento Section */}
-            <Box sx={{ mb: 4 }}>
+            <Box sx={{ mb: 4, opacity: formData.nacionalExtranjero !== 'extranjero' ? 0.5 : 1 }}>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
                 Pedimento (PDF)
               </Typography>
+              {formData.nacionalExtranjero !== 'extranjero' && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Solo aplica para activos extranjeros
+                </Typography>
+              )}
 
               {/* Existing Pedimento */}
               {existingFiles.pedimento && !deletedFiles.pedimento && (
@@ -832,6 +944,7 @@ export default function EditarActivoPage() {
                   variant="outlined"
                   component="label"
                   startIcon={<PdfIcon />}
+                  disabled={formData.nacionalExtranjero !== 'extranjero'}
                 >
                   {existingFiles.pedimento ? 'Reemplazar Pedimento' : 'Subir Pedimento'}
                   <input
@@ -839,6 +952,7 @@ export default function EditarActivoPage() {
                     hidden
                     accept=".pdf,application/pdf"
                     onChange={handleNewPedimentoChange}
+                    disabled={formData.nacionalExtranjero !== 'extranjero'}
                   />
                 </Button>
               ) : (
@@ -967,6 +1081,110 @@ export default function EditarActivoPage() {
                     </Box>
                   </Box>
                   <IconButton color="error" onClick={handleRemoveNewFactura}>
+                    <DeleteIcon />
+                  </IconButton>
+                </Box>
+              )}
+            </Box>
+
+            <Divider sx={{ my: 4 }} />
+
+            {/* Formato de Alta Section */}
+            <Box sx={{ mb: 4 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                Formato de Alta (PDF)
+              </Typography>
+
+              {/* Existing Formato de Alta */}
+              {existingFiles.formatoAlta && !deletedFiles.formatoAlta && (
+                <Box
+                  sx={{
+                    p: 2,
+                    border: '1px solid #e0e0e0',
+                    borderRadius: 2,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: '#f5f5f5',
+                    mb: 2,
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <PdfIcon color="error" />
+                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                      Formato de Alta existente
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <IconButton
+                      color="primary"
+                      onClick={() => openFileViewer(existingFiles.formatoAlta, 'pdf', 'Formato de Alta')}
+                      title="Ver"
+                    >
+                      <ViewIcon />
+                    </IconButton>
+                    <IconButton
+                      color="error"
+                      onClick={handleDeleteExistingFormatoAlta}
+                      title="Eliminar"
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </Box>
+                </Box>
+              )}
+
+              {existingFiles.formatoAlta && deletedFiles.formatoAlta && (
+                <Alert
+                  severity="warning"
+                  sx={{ mb: 2 }}
+                  action={
+                    <Button color="inherit" size="small" onClick={handleRestoreExistingFormatoAlta}>
+                      Restaurar
+                    </Button>
+                  }
+                >
+                  Formato de Alta marcado para eliminar
+                </Alert>
+              )}
+
+              {/* New Formato de Alta */}
+              {!newFormatoAlta ? (
+                <Button
+                  variant="outlined"
+                  component="label"
+                  startIcon={<PdfIcon />}
+                >
+                  {existingFiles.formatoAlta ? 'Reemplazar Formato de Alta' : 'Subir Formato de Alta'}
+                  <input
+                    type="file"
+                    hidden
+                    accept=".pdf,application/pdf"
+                    onChange={handleNewFormatoAltaChange}
+                  />
+                </Button>
+              ) : (
+                <Box
+                  sx={{
+                    p: 2,
+                    border: '2px solid #4caf50',
+                    borderRadius: 2,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: '#e8f5e9',
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <PdfIcon color="error" />
+                    <Box>
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        {newFormatoAlta.name}
+                      </Typography>
+                      <Chip label="Nuevo" size="small" color="success" />
+                    </Box>
+                  </Box>
+                  <IconButton color="error" onClick={handleRemoveNewFormatoAlta}>
                     <DeleteIcon />
                   </IconButton>
                 </Box>

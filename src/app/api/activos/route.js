@@ -48,12 +48,17 @@ export async function POST(request) {
       numeroPedimento: formData.get('numeroPedimento') || null,
       fechaAlta: formData.get('fechaAlta') || null,
       userAlta: formData.get('userAlta') || null,
+      numeroCapex: formData.get('numeroCapex') || null,
+      ordenInterna: formData.get('ordenInterna') || null,
+      observaciones: formData.get('observaciones') || null,
+      statusCipFa: formData.get('statusCipFa') || null,
     };
 
     // Extract files
     const assetPictures = formData.getAll('assetPictures');
     const pedimentoFile = formData.get('pedimento');
     const facturaFile = formData.get('factura');
+    const formatoAltaFile = formData.get('formatoAlta');
 
     // Validate required fields
     if (!assetData.numeroActivo || !assetData.numeroEtiqueta || !assetData.tipo_id ||
@@ -68,8 +73,9 @@ export async function POST(request) {
     // Insert into database
     const result = await query(
       `INSERT INTO activos (numeroActivo, numeroEtiqueta, tipo_id, marca, modelo, serie, 
-        ubicacion_id, planta_id, nacionalExtranjero, numeroPedimento, status, fechaAlta, userAlta) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'activo', ?, ?)`,
+        ubicacion_id, planta_id, nacionalExtranjero, numeroPedimento, status, fechaAlta, userAlta,
+        numeroCapex, ordenInterna, observaciones, statusCipFa) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'activo', ?, ?, ?, ?, ?, ?)`,
       [
         assetData.numeroActivo,
         assetData.numeroEtiqueta,
@@ -83,6 +89,10 @@ export async function POST(request) {
         assetData.numeroPedimento,
         assetData.fechaAlta,
         assetData.userAlta,
+        assetData.numeroCapex,
+        assetData.ordenInterna,
+        assetData.observaciones,
+        assetData.statusCipFa,
       ]
     );
 
@@ -92,6 +102,7 @@ export async function POST(request) {
       pictures: [],
       pedimento: null,
       factura: null,
+      formatoAlta: null,
     };
 
     // Save asset pictures
@@ -117,6 +128,13 @@ export async function POST(request) {
       const ext = getFileExtension(facturaFile.name);
       const filename = `${filePrefix}_factura.${ext}`;
       savedFiles.factura = await saveFile(facturaFile, 'facturas', filename);
+    }
+
+    // Save formato de alta PDF
+    if (formatoAltaFile && formatoAltaFile.size > 0) {
+      const ext = getFileExtension(formatoAltaFile.name);
+      const filename = `${filePrefix}_formatoAlta.${ext}`;
+      savedFiles.formatoAlta = await saveFile(formatoAltaFile, 'formatosAlta', filename);
     }
 
     console.log('Files saved:', savedFiles);

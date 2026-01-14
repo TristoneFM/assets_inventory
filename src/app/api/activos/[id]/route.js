@@ -69,6 +69,10 @@ export async function PUT(request, { params }) {
       nacionalExtranjero,
       numeroPedimento,
       status,
+      numeroCapex,
+      ordenInterna,
+      observaciones,
+      statusCipFa,
     } = body;
 
     await query(
@@ -83,7 +87,11 @@ export async function PUT(request, { params }) {
         planta_id = ?,
         nacionalExtranjero = ?,
         numeroPedimento = ?,
-        status = ?
+        status = ?,
+        numeroCapex = ?,
+        ordenInterna = ?,
+        observaciones = ?,
+        statusCipFa = ?
       WHERE id = ?`,
       [
         numeroActivo,
@@ -97,6 +105,10 @@ export async function PUT(request, { params }) {
         nacionalExtranjero,
         numeroPedimento || null,
         status || 'activo',
+        numeroCapex || null,
+        ordenInterna || null,
+        observaciones || null,
+        statusCipFa || null,
         id,
       ]
     );

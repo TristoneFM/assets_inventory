@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import * as XLSX from 'xlsx';
 import {
   Box,
   Typography,
@@ -28,6 +29,11 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Menu,
+  FormControlLabel,
+  Checkbox,
+  Divider,
+  Tooltip,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -44,6 +50,8 @@ import {
   PictureAsPdf as PdfIcon,
   PhotoLibrary as PhotoIcon,
   Download as DownloadIcon,
+  ViewColumn as ViewColumnIcon,
+  FileDownload as ExcelIcon,
 } from '@mui/icons-material';
 import PageBanner from '@/app/components/PageBanner';
 
@@ -67,6 +75,7 @@ export default function BuscarActivosPage() {
     ubicacion: '',
     nacionalExtranjero: '',
     status: 'activo', // Default to show only active assets
+    statusCipFa: '',
   });
 
   // Dropdown options
@@ -77,7 +86,7 @@ export default function BuscarActivosPage() {
   // View dialog
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedActivo, setSelectedActivo] = useState(null);
-  const [assetFiles, setAssetFiles] = useState({ pictures: [], pedimento: null, factura: null });
+  const [assetFiles, setAssetFiles] = useState({ pictures: [], pedimento: null, factura: null, formatoAlta: null, formatoBaja: null });
   const [loadingFiles, setLoadingFiles] = useState(false);
 
   // File viewer modal
@@ -102,9 +111,165 @@ export default function BuscarActivosPage() {
   // Delete dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [activoToDelete, setActivoToDelete] = useState(null);
+  const [formatoBajaFile, setFormatoBajaFile] = useState(null);
+  const [comentarioBaja, setComentarioBaja] = useState('');
+  const [deletingAsset, setDeletingAsset] = useState(false);
 
   // Current logged-in user
   const [currentUser, setCurrentUser] = useState(null);
+
+  // Column visibility
+  const [columnMenuAnchor, setColumnMenuAnchor] = useState(null);
+  const [visibleColumns, setVisibleColumns] = useState({
+    numeroActivo: true,
+    numeroEtiqueta: true,
+    tipo: true,
+    marcaModelo: true,
+    serie: false,
+    ubicacion: true,
+    planta: true,
+    nacionalExtranjero: false,
+    fechaAlta: false,
+    userAlta: false,
+    numeroCapex: false,
+    ordenInterna: false,
+    statusCipFa: false,
+    status: true,
+    acciones: true,
+  });
+
+  // Column definitions
+  const columnDefinitions = [
+    { key: 'numeroActivo', label: 'No. Activo' },
+    { key: 'numeroEtiqueta', label: 'No. Etiqueta' },
+    { key: 'tipo', label: 'Tipo' },
+    { key: 'marcaModelo', label: 'Marca / Modelo' },
+    { key: 'serie', label: 'Serie' },
+    { key: 'ubicacion', label: 'Ubicación' },
+    { key: 'planta', label: 'Planta' },
+    { key: 'nacionalExtranjero', label: 'Nacional/Extranjero' },
+    { key: 'fechaAlta', label: 'Fecha Alta' },
+    { key: 'userAlta', label: 'Usuario Alta' },
+    { key: 'numeroCapex', label: 'No. Capex' },
+    { key: 'ordenInterna', label: 'Orden Interna' },
+    { key: 'statusCipFa', label: 'CIP/FA' },
+    { key: 'status', label: 'Status' },
+    { key: 'acciones', label: 'Acciones', alwaysVisible: true },
+  ];
+
+  const handleColumnMenuOpen = (event) => {
+    setColumnMenuAnchor(event.currentTarget);
+  };
+
+  const handleColumnMenuClose = () => {
+    setColumnMenuAnchor(null);
+  };
+
+  const toggleColumn = (columnKey) => {
+    setVisibleColumns((prev) => ({
+      ...prev,
+      [columnKey]: !prev[columnKey],
+    }));
+  };
+
+  const showAllColumns = () => {
+    const allVisible = {};
+    columnDefinitions.forEach((col) => {
+      allVisible[col.key] = true;
+    });
+    setVisibleColumns(allVisible);
+  };
+
+  const hideOptionalColumns = () => {
+    setVisibleColumns({
+      numeroActivo: true,
+      numeroEtiqueta: true,
+      tipo: true,
+      marcaModelo: true,
+      serie: false,
+      ubicacion: true,
+      planta: true,
+      nacionalExtranjero: false,
+      fechaAlta: false,
+      userAlta: false,
+      numeroCapex: false,
+      ordenInterna: false,
+      statusCipFa: false,
+      status: true,
+      acciones: true,
+    });
+  };
+
+  // Export to Excel function
+  const exportToExcel = () => {
+    // Prepare data for export - only include visible columns (except actions)
+    const exportData = filteredActivos.map((activo) => {
+      const row = {};
+      
+      if (visibleColumns.numeroActivo) row['No. Activo'] = activo.numeroActivo || '';
+      if (visibleColumns.numeroEtiqueta) row['No. Etiqueta'] = activo.numeroEtiqueta || '';
+      if (visibleColumns.tipo) row['Tipo'] = activo.tipo_nombre || '';
+      if (visibleColumns.marcaModelo) {
+        row['Marca'] = activo.marca || '';
+        row['Modelo'] = activo.modelo || '';
+      }
+      if (visibleColumns.serie) row['Serie'] = activo.serie || '';
+      if (visibleColumns.ubicacion) row['Ubicación'] = activo.ubicacion_nombre || '';
+      if (visibleColumns.planta) row['Planta'] = activo.planta_nombre || '';
+      if (visibleColumns.nacionalExtranjero) row['Nacional/Extranjero'] = activo.nacionalExtranjero || '';
+      if (visibleColumns.fechaAlta) {
+        row['Fecha Alta'] = activo.fechaAlta 
+          ? new Date(activo.fechaAlta).toLocaleDateString('es-MX') 
+          : '';
+      }
+      if (visibleColumns.userAlta) row['Usuario Alta'] = activo.userAlta || '';
+      if (visibleColumns.numeroCapex) row['No. Capex'] = activo.numeroCapex || '';
+      if (visibleColumns.ordenInterna) row['Orden Interna'] = activo.ordenInterna || '';
+      if (visibleColumns.statusCipFa) row['CIP/FA'] = activo.statusCipFa || '';
+      if (visibleColumns.status) row['Status'] = activo.status || '';
+      
+      // Always include additional info that might be useful
+      row['No. Pedimento'] = activo.numeroPedimento || '';
+      if (activo.fechaBaja) {
+        row['Fecha Baja'] = new Date(activo.fechaBaja).toLocaleDateString('es-MX');
+      }
+      if (activo.userBaja) {
+        row['Usuario Baja'] = activo.userBaja;
+      }
+      if (activo.comentarioBaja) {
+        row['Motivo Baja'] = activo.comentarioBaja;
+      }
+      if (activo.observaciones) {
+        row['Observaciones'] = activo.observaciones;
+      }
+      
+      return row;
+    });
+
+    // Create workbook and worksheet
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Activos');
+
+    // Auto-size columns
+    const maxWidths = {};
+    exportData.forEach((row) => {
+      Object.keys(row).forEach((key) => {
+        const value = String(row[key] || '');
+        maxWidths[key] = Math.max(maxWidths[key] || key.length, value.length);
+      });
+    });
+    worksheet['!cols'] = Object.keys(maxWidths).map((key) => ({
+      wch: Math.min(maxWidths[key] + 2, 50),
+    }));
+
+    // Generate filename with date
+    const today = new Date().toISOString().split('T')[0];
+    const filename = `activos_${today}.xlsx`;
+
+    // Download file
+    XLSX.writeFile(workbook, filename);
+  };
 
   useEffect(() => {
     fetchData();
@@ -195,6 +360,11 @@ export default function BuscarActivosPage() {
       filtered = filtered.filter((activo) => activo.status === filters.status);
     }
 
+    // Status CIP/FA filter
+    if (filters.statusCipFa) {
+      filtered = filtered.filter((activo) => activo.statusCipFa === filters.statusCipFa);
+    }
+
     setFilteredActivos(filtered);
     setPage(0);
   };
@@ -214,6 +384,7 @@ export default function BuscarActivosPage() {
       ubicacion: '',
       nacionalExtranjero: '',
       status: '', // Show all when cleared
+      statusCipFa: '',
     });
   };
 
@@ -230,7 +401,7 @@ export default function BuscarActivosPage() {
     setSelectedActivo(activo);
     setViewDialogOpen(true);
     setLoadingFiles(true);
-    setAssetFiles({ pictures: [], pedimento: null, factura: null });
+    setAssetFiles({ pictures: [], pedimento: null, factura: null, formatoAlta: null, formatoBaja: null });
 
     // Fetch files for this asset
     try {
@@ -252,22 +423,49 @@ export default function BuscarActivosPage() {
 
   const handleDeleteClick = (activo) => {
     setActivoToDelete(activo);
+    setFormatoBajaFile(null);
+    setComentarioBaja('');
     setDeleteDialogOpen(true);
+  };
+
+  const handleFormatoBajaChange = (event) => {
+    const file = event.target.files[0];
+    if (file && file.type === 'application/pdf') {
+      setFormatoBajaFile(file);
+    } else {
+      setError('Por favor seleccione un archivo PDF para el formato de baja');
+    }
+    event.target.value = '';
+  };
+
+  const handleRemoveFormatoBaja = () => {
+    setFormatoBajaFile(null);
   };
 
   const handleDeleteConfirm = async () => {
     if (!activoToDelete) return;
 
+    // Validate formato de baja file is required
+    if (!formatoBajaFile) {
+      setError('El formato de baja es requerido para dar de baja un activo');
+      return;
+    }
+
+    setDeletingAsset(true);
+
     // Get userBaja from logged-in user
     const userBaja = currentUser?.emp_alias || currentUser?.username || 'unknown';
 
     try {
-      const response = await fetch(`/api/activos/${activoToDelete.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userBaja }),
+      // Create FormData to send both data and file
+      const submitData = new FormData();
+      submitData.append('userBaja', userBaja);
+      submitData.append('comentarioBaja', comentarioBaja);
+      submitData.append('formatoBaja', formatoBajaFile);
+
+      const response = await fetch(`/api/activos/${activoToDelete.id}/baja`, {
+        method: 'POST',
+        body: submitData,
       });
 
       const data = await response.json();
@@ -275,6 +473,10 @@ export default function BuscarActivosPage() {
       if (data.success) {
         setSuccess('Activo dado de baja exitosamente');
         fetchData();
+        setDeleteDialogOpen(false);
+        setActivoToDelete(null);
+        setFormatoBajaFile(null);
+        setComentarioBaja('');
       } else {
         setError(data.message || 'Error al dar de baja el activo');
       }
@@ -282,9 +484,15 @@ export default function BuscarActivosPage() {
       console.error('Error deleting asset:', err);
       setError('Error de conexión');
     } finally {
-      setDeleteDialogOpen(false);
-      setActivoToDelete(null);
+      setDeletingAsset(false);
     }
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteDialogOpen(false);
+    setActivoToDelete(null);
+    setFormatoBajaFile(null);
+    setComentarioBaja('');
   };
 
   const getStatusChip = (status) => {
@@ -295,9 +503,10 @@ export default function BuscarActivosPage() {
     };
     return (
       <Chip
-        label={status || 'activo'}
+        label={(status || 'activo').toUpperCase()}
         color={statusColors[status] || 'default'}
         size="small"
+        sx={{ fontWeight: 600 }}
       />
     );
   };
@@ -420,6 +629,19 @@ export default function BuscarActivosPage() {
                 <MenuItem value="baja">Baja</MenuItem>
               </TextField>
             </Grid>
+            <Grid item xs={12} sm={6} md={2}>
+              <TextField
+                fullWidth
+                select
+                label="CIP/FA"
+                value={filters.statusCipFa}
+                onChange={handleFilterChange('statusCipFa')}
+              >
+                <MenuItem value="">Todos</MenuItem>
+                <MenuItem value="CIP">CIP</MenuItem>
+                <MenuItem value="FA">FA</MenuItem>
+              </TextField>
+            </Grid>
           </Grid>
           <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
             <Button
@@ -440,13 +662,79 @@ export default function BuscarActivosPage() {
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
               Resultados ({filteredActivos.length} activos)
             </Typography>
-            <Button
-              variant="contained"
-              onClick={() => router.push('/crear-activo')}
-            >
-              Nuevo Activo
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Tooltip title="Exportar a Excel">
+                <Button
+                  variant="outlined"
+                  color="success"
+                  startIcon={<ExcelIcon />}
+                  onClick={exportToExcel}
+                  disabled={filteredActivos.length === 0}
+                >
+                  Excel
+                </Button>
+              </Tooltip>
+              <Tooltip title="Mostrar/Ocultar Columnas">
+                <Button
+                  variant="outlined"
+                  startIcon={<ViewColumnIcon />}
+                  onClick={handleColumnMenuOpen}
+                >
+                  Columnas
+                </Button>
+              </Tooltip>
+              <Button
+                variant="contained"
+                onClick={() => router.push('/crear-activo')}
+              >
+                Nuevo Activo
+              </Button>
+            </Box>
           </Box>
+
+          {/* Column Visibility Menu */}
+          <Menu
+            anchorEl={columnMenuAnchor}
+            open={Boolean(columnMenuAnchor)}
+            onClose={handleColumnMenuClose}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            PaperProps={{
+              sx: { minWidth: 250, maxHeight: 400 },
+            }}
+          >
+            <Box sx={{ px: 2, py: 1 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                Columnas Visibles
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                <Button size="small" variant="text" onClick={showAllColumns}>
+                  Mostrar Todas
+                </Button>
+                <Button size="small" variant="text" onClick={hideOptionalColumns}>
+                  Por Defecto
+                </Button>
+              </Box>
+            </Box>
+            <Divider />
+            <Box sx={{ px: 1, py: 0.5 }}>
+              {columnDefinitions.map((col) => (
+                <FormControlLabel
+                  key={col.key}
+                  control={
+                    <Checkbox
+                      checked={visibleColumns[col.key]}
+                      onChange={() => toggleColumn(col.key)}
+                      disabled={col.alwaysVisible}
+                      size="small"
+                    />
+                  }
+                  label={col.label}
+                  sx={{ display: 'block', ml: 0 }}
+                />
+              ))}
+            </Box>
+          </Menu>
 
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
@@ -461,17 +749,24 @@ export default function BuscarActivosPage() {
           ) : (
             <>
               <TableContainer component={Paper} variant="outlined">
-                <Table>
+                <Table size="small">
                   <TableHead>
                     <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                      <TableCell>No. Activo</TableCell>
-                      <TableCell>No. Etiqueta</TableCell>
-                      <TableCell>Tipo</TableCell>
-                      <TableCell>Marca / Modelo</TableCell>
-                      <TableCell>Ubicación</TableCell>
-                      <TableCell>Planta</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell align="center">Acciones</TableCell>
+                      {visibleColumns.numeroActivo && <TableCell>No. Activo</TableCell>}
+                      {visibleColumns.numeroEtiqueta && <TableCell>No. Etiqueta</TableCell>}
+                      {visibleColumns.tipo && <TableCell>Tipo</TableCell>}
+                      {visibleColumns.marcaModelo && <TableCell>Marca / Modelo</TableCell>}
+                      {visibleColumns.serie && <TableCell>Serie</TableCell>}
+                      {visibleColumns.ubicacion && <TableCell>Ubicación</TableCell>}
+                      {visibleColumns.planta && <TableCell>Planta</TableCell>}
+                      {visibleColumns.nacionalExtranjero && <TableCell>Nac/Ext</TableCell>}
+                      {visibleColumns.fechaAlta && <TableCell>Fecha Alta</TableCell>}
+                      {visibleColumns.userAlta && <TableCell>Usuario Alta</TableCell>}
+                      {visibleColumns.numeroCapex && <TableCell>No. Capex</TableCell>}
+                      {visibleColumns.ordenInterna && <TableCell>Orden Interna</TableCell>}
+                      {visibleColumns.statusCipFa && <TableCell>CIP/FA</TableCell>}
+                      {visibleColumns.status && <TableCell>Status</TableCell>}
+                      {visibleColumns.acciones && <TableCell align="center">Acciones</TableCell>}
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -479,41 +774,64 @@ export default function BuscarActivosPage() {
                       .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                       .map((activo) => (
                         <TableRow key={activo.id} hover>
-                          <TableCell>{activo.numeroActivo}</TableCell>
-                          <TableCell>{activo.numeroEtiqueta}</TableCell>
-                          <TableCell>{activo.tipo_nombre || '-'}</TableCell>
-                          <TableCell>
-                            {activo.marca} / {activo.modelo}
-                          </TableCell>
-                          <TableCell>{activo.ubicacion_nombre || '-'}</TableCell>
-                          <TableCell>{activo.planta_nombre || '-'}</TableCell>
-                          <TableCell>{getStatusChip(activo.status)}</TableCell>
-                          <TableCell align="center">
-                            <IconButton
-                              size="small"
-                              color="primary"
-                              onClick={() => handleView(activo)}
-                              title="Ver detalles"
-                            >
-                              <ViewIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton
-                              size="small"
-                              color="primary"
-                              onClick={() => handleEdit(activo)}
-                              title="Editar"
-                            >
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => handleDeleteClick(activo)}
-                              title="Eliminar"
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </TableCell>
+                          {visibleColumns.numeroActivo && <TableCell>{activo.numeroActivo}</TableCell>}
+                          {visibleColumns.numeroEtiqueta && <TableCell>{activo.numeroEtiqueta}</TableCell>}
+                          {visibleColumns.tipo && <TableCell>{activo.tipo_nombre || '-'}</TableCell>}
+                          {visibleColumns.marcaModelo && (
+                            <TableCell>
+                              {activo.marca} / {activo.modelo}
+                            </TableCell>
+                          )}
+                          {visibleColumns.serie && <TableCell>{activo.serie || '-'}</TableCell>}
+                          {visibleColumns.ubicacion && <TableCell>{activo.ubicacion_nombre || '-'}</TableCell>}
+                          {visibleColumns.planta && <TableCell>{activo.planta_nombre || '-'}</TableCell>}
+                          {visibleColumns.nacionalExtranjero && (
+                            <TableCell sx={{ textTransform: 'capitalize' }}>
+                              {activo.nacionalExtranjero || '-'}
+                            </TableCell>
+                          )}
+                          {visibleColumns.fechaAlta && (
+                            <TableCell>
+                              {activo.fechaAlta
+                                ? new Date(activo.fechaAlta).toLocaleDateString('es-MX')
+                                : '-'}
+                            </TableCell>
+                          )}
+                          {visibleColumns.userAlta && <TableCell>{activo.userAlta || '-'}</TableCell>}
+                          {visibleColumns.numeroCapex && <TableCell>{activo.numeroCapex || '-'}</TableCell>}
+                          {visibleColumns.ordenInterna && <TableCell>{activo.ordenInterna || '-'}</TableCell>}
+                          {visibleColumns.statusCipFa && <TableCell>{activo.statusCipFa || '-'}</TableCell>}
+                          {visibleColumns.status && <TableCell>{getStatusChip(activo.status)}</TableCell>}
+                          {visibleColumns.acciones && (
+                            <TableCell align="center">
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => handleView(activo)}
+                                title="Ver detalles"
+                              >
+                                <ViewIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => handleEdit(activo)}
+                                title={activo.status === 'baja' ? 'No se puede editar un activo dado de baja' : 'Editar'}
+                                disabled={activo.status === 'baja'}
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleDeleteClick(activo)}
+                                title={activo.status === 'baja' ? 'Este activo ya está dado de baja' : 'Dar de Baja'}
+                                disabled={activo.status === 'baja'}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                   </TableBody>
@@ -716,6 +1034,60 @@ export default function BuscarActivosPage() {
                 </Grid>
               </Box>
 
+              {/* Información Financiera */}
+              <Box sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                  <InventoryIcon color="primary" />
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#1976d2' }}>
+                    Información Financiera
+                  </Typography>
+                </Box>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <Paper elevation={0} sx={{ p: 2, backgroundColor: '#f5f5f5', borderRadius: 2 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        Número de Capex
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5 }}>
+                        {selectedActivo.numeroCapex || '-'}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Paper elevation={0} sx={{ p: 2, backgroundColor: '#f5f5f5', borderRadius: 2 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        Orden Interna
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5 }}>
+                        {selectedActivo.ordenInterna || '-'}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Paper elevation={0} sx={{ p: 2, backgroundColor: '#f5f5f5', borderRadius: 2 }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        Status CIP/FA
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5 }}>
+                        {selectedActivo.statusCipFa || '-'}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  {selectedActivo.observaciones && (
+                    <Grid item xs={12}>
+                      <Paper elevation={0} sx={{ p: 2, backgroundColor: '#f5f5f5', borderRadius: 2 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                          Observaciones
+                        </Typography>
+                        <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5, whiteSpace: 'pre-wrap' }}>
+                          {selectedActivo.observaciones}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  )}
+                </Grid>
+              </Box>
+
               {/* Fechas de Registro */}
               <Box sx={{ p: 3 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
@@ -777,6 +1149,53 @@ export default function BuscarActivosPage() {
                           </Typography>
                         </Paper>
                       </Grid>
+                      {selectedActivo.comentarioBaja && (
+                        <Grid item xs={12}>
+                          <Paper elevation={0} sx={{ p: 2, backgroundColor: '#ffebee', borderRadius: 2, border: '1px solid #ffcdd2' }}>
+                            <Typography variant="caption" color="error" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                              Motivo / Comentario de Baja
+                            </Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5, color: '#c62828', whiteSpace: 'pre-wrap' }}>
+                              {selectedActivo.comentarioBaja}
+                            </Typography>
+                          </Paper>
+                        </Grid>
+                      )}
+                      {assetFiles.formatoBaja && (
+                        <Grid item xs={12} sm={6}>
+                          <Paper
+                            elevation={0}
+                            sx={{
+                              p: 2,
+                              backgroundColor: '#ffebee',
+                              borderRadius: 2,
+                              border: '1px solid #ffcdd2',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <PdfIcon sx={{ color: '#c62828' }} />
+                              <Box>
+                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#c62828' }}>
+                                  Formato de Baja
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  PDF
+                                </Typography>
+                              </Box>
+                            </Box>
+                            <IconButton
+                              sx={{ color: '#c62828' }}
+                              onClick={() => openFileViewer(assetFiles.formatoBaja, 'pdf', 'Formato de Baja')}
+                              title="Ver Formato de Baja"
+                            >
+                              <ViewIcon />
+                            </IconButton>
+                          </Paper>
+                        </Grid>
+                      )}
                     </>
                   )}
                 </Grid>
@@ -922,10 +1341,46 @@ export default function BuscarActivosPage() {
                           </Paper>
                         </Grid>
                       )}
+
+                      {assetFiles.formatoAlta && (
+                        <Grid item xs={12} sm={6}>
+                          <Paper
+                            elevation={0}
+                            sx={{
+                              p: 2,
+                              backgroundColor: 'white',
+                              borderRadius: 2,
+                              border: '1px solid #e0e0e0',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <PdfIcon color="error" />
+                              <Box>
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                  Formato de Alta
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  PDF
+                                </Typography>
+                              </Box>
+                            </Box>
+                            <IconButton
+                              color="primary"
+                              onClick={() => openFileViewer(assetFiles.formatoAlta, 'pdf', 'Formato de Alta')}
+                              title="Ver Formato de Alta"
+                            >
+                              <ViewIcon />
+                            </IconButton>
+                          </Paper>
+                        </Grid>
+                      )}
                     </Grid>
 
                     {/* No files message */}
-                    {assetFiles.pictures.length === 0 && !assetFiles.pedimento && !assetFiles.factura && (
+                    {assetFiles.pictures.length === 0 && !assetFiles.pedimento && !assetFiles.factura && !assetFiles.formatoAlta && !assetFiles.formatoBaja && (
                       <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
                         No hay archivos adjuntos para este activo
                       </Typography>
@@ -946,8 +1401,10 @@ export default function BuscarActivosPage() {
                   setViewDialogOpen(false);
                   handleEdit(selectedActivo);
                 }}
+                disabled={selectedActivo?.status === 'baja'}
+                title={selectedActivo?.status === 'baja' ? 'No se puede editar un activo dado de baja' : ''}
               >
-                Editar Activo
+                {selectedActivo?.status === 'baja' ? 'Activo Dado de Baja' : 'Editar Activo'}
               </Button>
             </DialogActions>
           </>
@@ -955,24 +1412,109 @@ export default function BuscarActivosPage() {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-        <DialogTitle>Confirmar Baja de Activo</DialogTitle>
-        <DialogContent>
-          <Typography>
+      <Dialog open={deleteDialogOpen} onClose={handleCancelDelete} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ backgroundColor: '#ffebee', color: '#c62828' }}>
+          Confirmar Baja de Activo
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          <Typography sx={{ mb: 2 }}>
             ¿Está seguro que desea dar de baja el activo{' '}
             <strong>{activoToDelete?.numeroEtiqueta}</strong>?
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
             El activo será marcado como &quot;baja&quot; con la fecha de hoy y no aparecerá en las búsquedas activas.
           </Typography>
-          <Typography variant="body2" sx={{ mt: 2 }}>
-            Usuario: <strong>{currentUser?.emp_alias || currentUser?.username || 'N/A'}</strong>
+
+          {/* Formato de Baja Upload - Required */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+              Formato de Baja (PDF) <span style={{ color: '#c62828' }}>*</span>
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Es obligatorio subir el formato de baja para continuar.
+            </Typography>
+            
+            {!formatoBajaFile ? (
+              <Button
+                variant="outlined"
+                component="label"
+                startIcon={<PdfIcon />}
+                color="error"
+              >
+                Seleccionar PDF de Formato de Baja
+                <input
+                  type="file"
+                  hidden
+                  accept=".pdf,application/pdf"
+                  onChange={handleFormatoBajaChange}
+                />
+              </Button>
+            ) : (
+              <Box
+                sx={{
+                  p: 2,
+                  border: '1px solid #4caf50',
+                  borderRadius: 2,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  backgroundColor: '#e8f5e9',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <PdfIcon color="error" />
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      {formatoBajaFile.name}
+                    </Typography>
+                    <Chip
+                      label={`${(formatoBajaFile.size / 1024).toFixed(2)} KB`}
+                      size="small"
+                      variant="outlined"
+                    />
+                  </Box>
+                </Box>
+                <IconButton color="error" onClick={handleRemoveFormatoBaja} size="small">
+                  <DeleteIcon />
+                </IconButton>
+              </Box>
+            )}
+          </Box>
+
+          {/* Comentario de Baja - Optional */}
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+              Comentario / Motivo de Baja (Opcional)
+            </Typography>
+            <TextField
+              fullWidth
+              multiline
+              rows={3}
+              placeholder="Ingrese el motivo o comentarios adicionales sobre la baja del activo..."
+              value={comentarioBaja}
+              onChange={(e) => setComentarioBaja(e.target.value)}
+              variant="outlined"
+            />
+          </Box>
+
+          <Divider sx={{ my: 2 }} />
+
+          <Typography variant="body2">
+            Usuario que realiza la baja: <strong>{currentUser?.emp_alias || currentUser?.username || 'N/A'}</strong>
           </Typography>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>Cancelar</Button>
-          <Button variant="contained" color="error" onClick={handleDeleteConfirm}>
-            Dar de Baja
+        <DialogActions sx={{ p: 2, borderTop: '1px solid #e0e0e0' }}>
+          <Button onClick={handleCancelDelete} disabled={deletingAsset}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleDeleteConfirm}
+            disabled={!formatoBajaFile || deletingAsset}
+            startIcon={deletingAsset ? <CircularProgress size={20} color="inherit" /> : <DeleteIcon />}
+          >
+            {deletingAsset ? 'Procesando...' : 'Dar de Baja'}
           </Button>
         </DialogActions>
       </Dialog>
