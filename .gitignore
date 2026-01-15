@@ -39,7 +39,5 @@ next-env.d.ts
 /public/uploads/pictures/*
 /public/uploads/pedimentos/*
 /public/uploads/facturas/*
-/public/uploads/formatosAlta/*
-/public/uploads/formatosBaja/*
 !public/uploads/**/.gitkeep
 

@@ -54,7 +54,6 @@ export default function CrearActivoPage() {
   const [assetPictures, setAssetPictures] = useState([]);
   const [pedimentoFile, setPedimentoFile] = useState(null);
   const [facturaFile, setFacturaFile] = useState(null);
-  const [formatoAltaFile, setFormatoAltaFile] = useState(null);
 
   // Dropdown data from database
   const [plantas, setPlantas] = useState([]);
@@ -154,20 +153,6 @@ export default function CrearActivoPage() {
     setFacturaFile(null);
   };
 
-  const handleFormatoAltaChange = (event) => {
-    const file = event.target.files[0];
-    if (file && file.type === 'application/pdf') {
-      setFormatoAltaFile(file);
-    } else {
-      setError('Por favor seleccione un archivo PDF para el formato de alta');
-    }
-    event.target.value = '';
-  };
-
-  const handleRemoveFormatoAlta = () => {
-    setFormatoAltaFile(null);
-  };
-
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
@@ -200,11 +185,6 @@ export default function CrearActivoPage() {
       // Add factura file if exists
       if (facturaFile) {
         submitData.append('factura', facturaFile);
-      }
-
-      // Add formato de alta file if exists
-      if (formatoAltaFile) {
-        submitData.append('formatoAlta', formatoAltaFile);
       }
 
       // TODO: Replace with actual API call
@@ -249,7 +229,6 @@ export default function CrearActivoPage() {
       setAssetPictures([]);
       setPedimentoFile(null);
       setFacturaFile(null);
-      setFormatoAltaFile(null);
 
       // Optionally redirect after a delay
       // setTimeout(() => router.push('/buscar-activos'), 2000);
@@ -431,9 +410,9 @@ export default function CrearActivoPage() {
                   value={formData.numeroPedimento}
                   onChange={handleChange('numeroPedimento')}
                   variant="outlined"
-                  disabled={formData.nacionalExtranjero !== 'extranjero'}
+                  disabled={formData.nacionalExtranjero === 'nacional'}
                   helperText={
-                    formData.nacionalExtranjero !== 'extranjero'
+                    formData.nacionalExtranjero === 'nacional'
                       ? 'Solo aplica para activos extranjeros'
                       : ''
                   }
@@ -459,7 +438,6 @@ export default function CrearActivoPage() {
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  required
                   label="Número de Capex"
                   name="numeroCapex"
                   value={formData.numeroCapex}
@@ -471,7 +449,6 @@ export default function CrearActivoPage() {
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  required
                   label="Orden Interna"
                   name="ordenInterna"
                   value={formData.ordenInterna}
@@ -483,7 +460,6 @@ export default function CrearActivoPage() {
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
-                  required
                   select
                   label="Status CIP/FA"
                   name="statusCipFa"
@@ -601,14 +577,14 @@ export default function CrearActivoPage() {
             <Divider sx={{ my: 4 }} />
 
             {/* Pedimento PDF Section */}
-            <Box sx={{ mb: 4, opacity: formData.nacionalExtranjero !== 'extranjero' ? 0.5 : 1 }}>
+            <Box sx={{ mb: 4 }}>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
                 Pedimento (PDF)
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                {formData.nacionalExtranjero === 'extranjero'
-                  ? 'Suba el archivo PDF del pedimento aduanal'
-                  : 'Solo aplica para activos extranjeros'}
+                {formData.nacionalExtranjero === 'extranjero' 
+                  ? 'Suba el archivo PDF del pedimento aduanal (Requerido para activos extranjeros)'
+                  : 'Suba el archivo PDF del pedimento aduanal (Opcional)'}
               </Typography>
                 
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
@@ -616,7 +592,6 @@ export default function CrearActivoPage() {
                     variant="outlined"
                     component="label"
                     startIcon={<PdfIcon />}
-                    disabled={formData.nacionalExtranjero !== 'extranjero'}
                   >
                     Seleccionar PDF de Pedimento
                     <input
@@ -624,7 +599,6 @@ export default function CrearActivoPage() {
                       hidden
                       accept=".pdf,application/pdf"
                       onChange={handlePedimentoChange}
-                      disabled={formData.nacionalExtranjero !== 'extranjero'}
                     />
                   </Button>
                 </Box>
@@ -718,68 +692,6 @@ export default function CrearActivoPage() {
                   <IconButton
                     color="error"
                     onClick={handleRemoveFactura}
-                    size="small"
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </Box>
-              )}
-            </Box>
-
-            <Divider sx={{ my: 4 }} />
-
-            {/* Formato de Alta PDF Section */}
-            <Box sx={{ mb: 4 }}>
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                Formato de Alta (PDF)
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Suba el archivo PDF del formato de alta del activo (Opcional)
-              </Typography>
-              
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                <Button
-                  variant="outlined"
-                  component="label"
-                  startIcon={<PdfIcon />}
-                >
-                  Seleccionar PDF de Formato de Alta
-                  <input
-                    type="file"
-                    hidden
-                    accept=".pdf,application/pdf"
-                    onChange={handleFormatoAltaChange}
-                  />
-                </Button>
-              </Box>
-
-              {formatoAltaFile && (
-                <Box
-                  sx={{
-                    p: 2,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 2,
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    backgroundColor: 'action.hover',
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <PdfIcon color="error" />
-                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                      {formatoAltaFile.name}
-                    </Typography>
-                    <Chip
-                      label={`${(formatoAltaFile.size / 1024).toFixed(2)} KB`}
-                      size="small"
-                      variant="outlined"
-                    />
-                  </Box>
-                  <IconButton
-                    color="error"
-                    onClick={handleRemoveFormatoAlta}
                     size="small"
                   >
                     <DeleteIcon />

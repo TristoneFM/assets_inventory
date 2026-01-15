@@ -39,8 +39,6 @@ export async function GET(request, { params }) {
       pictures: [],
       pedimento: null,
       factura: null,
-      formatoAlta: null,
-      formatoBaja: null,
     };
 
     // Scan pictures folder
@@ -80,30 +78,6 @@ export async function GET(request, { params }) {
       console.log('No facturas directory or empty');
     }
 
-    // Scan formatosAlta folder
-    try {
-      const formatosAltaDir = path.join(process.cwd(), 'public', 'uploads', 'formatosAlta');
-      const formatoAltaFiles = await readdir(formatosAltaDir);
-      const formatoAltaFile = formatoAltaFiles.find(file => file.startsWith(`${filePrefix}_formatoAlta`));
-      if (formatoAltaFile) {
-        files.formatoAlta = `/uploads/formatosAlta/${formatoAltaFile}`;
-      }
-    } catch (err) {
-      console.log('No formatosAlta directory or empty');
-    }
-
-    // Scan formatosBaja folder
-    try {
-      const formatosBajaDir = path.join(process.cwd(), 'public', 'uploads', 'formatosBaja');
-      const formatoBajaFiles = await readdir(formatosBajaDir);
-      const formatoBajaFile = formatoBajaFiles.find(file => file.startsWith(`${filePrefix}_formatoBaja`));
-      if (formatoBajaFile) {
-        files.formatoBaja = `/uploads/formatosBaja/${formatoBajaFile}`;
-      }
-    } catch (err) {
-      console.log('No formatosBaja directory or empty');
-    }
-
     return NextResponse.json({
       success: true,
       data: files,
@@ -121,7 +95,7 @@ export async function DELETE(request, { params }) {
   try {
     const { id } = params;
     const body = await request.json();
-    const { pictures = [], pedimento = false, factura = false, formatoAlta = false } = body;
+    const { pictures = [], pedimento = false, factura = false } = body;
 
     const deletedFiles = [];
 
@@ -186,32 +160,6 @@ export async function DELETE(request, { params }) {
           }
         } catch (err) {
           console.error('Error deleting factura:', err);
-        }
-      }
-    }
-
-    // Delete formatoAlta if requested
-    if (formatoAlta) {
-      const assets = await query(
-        'SELECT numeroEtiqueta FROM activos WHERE id = ?',
-        [id]
-      );
-
-      if (assets && assets.length > 0) {
-        const filePrefix = sanitizeFilename(assets[0].numeroEtiqueta);
-        
-        try {
-          const formatosAltaDir = path.join(process.cwd(), 'public', 'uploads', 'formatosAlta');
-          const formatoAltaFiles = await readdir(formatosAltaDir);
-          const formatoAltaFile = formatoAltaFiles.find(file => file.startsWith(`${filePrefix}_formatoAlta`));
-          
-          if (formatoAltaFile) {
-            const filePath = path.join(formatosAltaDir, formatoAltaFile);
-            await unlink(filePath);
-            deletedFiles.push(`/uploads/formatosAlta/${formatoAltaFile}`);
-          }
-        } catch (err) {
-          console.error('Error deleting formatoAlta:', err);
         }
       }
     }

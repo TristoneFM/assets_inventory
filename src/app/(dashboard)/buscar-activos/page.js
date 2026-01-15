@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import * as XLSX from 'xlsx';
 import {
   Box,
   Typography,
@@ -51,7 +50,6 @@ import {
   PhotoLibrary as PhotoIcon,
   Download as DownloadIcon,
   ViewColumn as ViewColumnIcon,
-  FileDownload as ExcelIcon,
 } from '@mui/icons-material';
 import PageBanner from '@/app/components/PageBanner';
 
@@ -86,7 +84,7 @@ export default function BuscarActivosPage() {
   // View dialog
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedActivo, setSelectedActivo] = useState(null);
-  const [assetFiles, setAssetFiles] = useState({ pictures: [], pedimento: null, factura: null, formatoAlta: null, formatoBaja: null });
+  const [assetFiles, setAssetFiles] = useState({ pictures: [], pedimento: null, factura: null });
   const [loadingFiles, setLoadingFiles] = useState(false);
 
   // File viewer modal
@@ -111,9 +109,6 @@ export default function BuscarActivosPage() {
   // Delete dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [activoToDelete, setActivoToDelete] = useState(null);
-  const [formatoBajaFile, setFormatoBajaFile] = useState(null);
-  const [comentarioBaja, setComentarioBaja] = useState('');
-  const [deletingAsset, setDeletingAsset] = useState(false);
 
   // Current logged-in user
   const [currentUser, setCurrentUser] = useState(null);
@@ -198,77 +193,6 @@ export default function BuscarActivosPage() {
       status: true,
       acciones: true,
     });
-  };
-
-  // Export to Excel function
-  const exportToExcel = () => {
-    // Prepare data for export - only include visible columns (except actions)
-    const exportData = filteredActivos.map((activo) => {
-      const row = {};
-      
-      if (visibleColumns.numeroActivo) row['No. Activo'] = activo.numeroActivo || '';
-      if (visibleColumns.numeroEtiqueta) row['No. Etiqueta'] = activo.numeroEtiqueta || '';
-      if (visibleColumns.tipo) row['Tipo'] = activo.tipo_nombre || '';
-      if (visibleColumns.marcaModelo) {
-        row['Marca'] = activo.marca || '';
-        row['Modelo'] = activo.modelo || '';
-      }
-      if (visibleColumns.serie) row['Serie'] = activo.serie || '';
-      if (visibleColumns.ubicacion) row['Ubicación'] = activo.ubicacion_nombre || '';
-      if (visibleColumns.planta) row['Planta'] = activo.planta_nombre || '';
-      if (visibleColumns.nacionalExtranjero) row['Nacional/Extranjero'] = activo.nacionalExtranjero || '';
-      if (visibleColumns.fechaAlta) {
-        row['Fecha Alta'] = activo.fechaAlta 
-          ? new Date(activo.fechaAlta).toLocaleDateString('es-MX') 
-          : '';
-      }
-      if (visibleColumns.userAlta) row['Usuario Alta'] = activo.userAlta || '';
-      if (visibleColumns.numeroCapex) row['No. Capex'] = activo.numeroCapex || '';
-      if (visibleColumns.ordenInterna) row['Orden Interna'] = activo.ordenInterna || '';
-      if (visibleColumns.statusCipFa) row['CIP/FA'] = activo.statusCipFa || '';
-      if (visibleColumns.status) row['Status'] = activo.status || '';
-      
-      // Always include additional info that might be useful
-      row['No. Pedimento'] = activo.numeroPedimento || '';
-      if (activo.fechaBaja) {
-        row['Fecha Baja'] = new Date(activo.fechaBaja).toLocaleDateString('es-MX');
-      }
-      if (activo.userBaja) {
-        row['Usuario Baja'] = activo.userBaja;
-      }
-      if (activo.comentarioBaja) {
-        row['Motivo Baja'] = activo.comentarioBaja;
-      }
-      if (activo.observaciones) {
-        row['Observaciones'] = activo.observaciones;
-      }
-      
-      return row;
-    });
-
-    // Create workbook and worksheet
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Activos');
-
-    // Auto-size columns
-    const maxWidths = {};
-    exportData.forEach((row) => {
-      Object.keys(row).forEach((key) => {
-        const value = String(row[key] || '');
-        maxWidths[key] = Math.max(maxWidths[key] || key.length, value.length);
-      });
-    });
-    worksheet['!cols'] = Object.keys(maxWidths).map((key) => ({
-      wch: Math.min(maxWidths[key] + 2, 50),
-    }));
-
-    // Generate filename with date
-    const today = new Date().toISOString().split('T')[0];
-    const filename = `activos_${today}.xlsx`;
-
-    // Download file
-    XLSX.writeFile(workbook, filename);
   };
 
   useEffect(() => {
@@ -401,7 +325,7 @@ export default function BuscarActivosPage() {
     setSelectedActivo(activo);
     setViewDialogOpen(true);
     setLoadingFiles(true);
-    setAssetFiles({ pictures: [], pedimento: null, factura: null, formatoAlta: null, formatoBaja: null });
+    setAssetFiles({ pictures: [], pedimento: null, factura: null });
 
     // Fetch files for this asset
     try {
@@ -423,49 +347,22 @@ export default function BuscarActivosPage() {
 
   const handleDeleteClick = (activo) => {
     setActivoToDelete(activo);
-    setFormatoBajaFile(null);
-    setComentarioBaja('');
     setDeleteDialogOpen(true);
-  };
-
-  const handleFormatoBajaChange = (event) => {
-    const file = event.target.files[0];
-    if (file && file.type === 'application/pdf') {
-      setFormatoBajaFile(file);
-    } else {
-      setError('Por favor seleccione un archivo PDF para el formato de baja');
-    }
-    event.target.value = '';
-  };
-
-  const handleRemoveFormatoBaja = () => {
-    setFormatoBajaFile(null);
   };
 
   const handleDeleteConfirm = async () => {
     if (!activoToDelete) return;
 
-    // Validate formato de baja file is required
-    if (!formatoBajaFile) {
-      setError('El formato de baja es requerido para dar de baja un activo');
-      return;
-    }
-
-    setDeletingAsset(true);
-
     // Get userBaja from logged-in user
     const userBaja = currentUser?.emp_alias || currentUser?.username || 'unknown';
 
     try {
-      // Create FormData to send both data and file
-      const submitData = new FormData();
-      submitData.append('userBaja', userBaja);
-      submitData.append('comentarioBaja', comentarioBaja);
-      submitData.append('formatoBaja', formatoBajaFile);
-
-      const response = await fetch(`/api/activos/${activoToDelete.id}/baja`, {
-        method: 'POST',
-        body: submitData,
+      const response = await fetch(`/api/activos/${activoToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userBaja }),
       });
 
       const data = await response.json();
@@ -473,10 +370,6 @@ export default function BuscarActivosPage() {
       if (data.success) {
         setSuccess('Activo dado de baja exitosamente');
         fetchData();
-        setDeleteDialogOpen(false);
-        setActivoToDelete(null);
-        setFormatoBajaFile(null);
-        setComentarioBaja('');
       } else {
         setError(data.message || 'Error al dar de baja el activo');
       }
@@ -484,15 +377,9 @@ export default function BuscarActivosPage() {
       console.error('Error deleting asset:', err);
       setError('Error de conexión');
     } finally {
-      setDeletingAsset(false);
+      setDeleteDialogOpen(false);
+      setActivoToDelete(null);
     }
-  };
-
-  const handleCancelDelete = () => {
-    setDeleteDialogOpen(false);
-    setActivoToDelete(null);
-    setFormatoBajaFile(null);
-    setComentarioBaja('');
   };
 
   const getStatusChip = (status) => {
@@ -503,10 +390,9 @@ export default function BuscarActivosPage() {
     };
     return (
       <Chip
-        label={(status || 'activo').toUpperCase()}
+        label={status || 'activo'}
         color={statusColors[status] || 'default'}
         size="small"
-        sx={{ fontWeight: 600 }}
       />
     );
   };
@@ -663,17 +549,6 @@ export default function BuscarActivosPage() {
               Resultados ({filteredActivos.length} activos)
             </Typography>
             <Box sx={{ display: 'flex', gap: 1 }}>
-              <Tooltip title="Exportar a Excel">
-                <Button
-                  variant="outlined"
-                  color="success"
-                  startIcon={<ExcelIcon />}
-                  onClick={exportToExcel}
-                  disabled={filteredActivos.length === 0}
-                >
-                  Excel
-                </Button>
-              </Tooltip>
               <Tooltip title="Mostrar/Ocultar Columnas">
                 <Button
                   variant="outlined"
@@ -1149,53 +1024,6 @@ export default function BuscarActivosPage() {
                           </Typography>
                         </Paper>
                       </Grid>
-                      {selectedActivo.comentarioBaja && (
-                        <Grid item xs={12}>
-                          <Paper elevation={0} sx={{ p: 2, backgroundColor: '#ffebee', borderRadius: 2, border: '1px solid #ffcdd2' }}>
-                            <Typography variant="caption" color="error" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                              Motivo / Comentario de Baja
-                            </Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5, color: '#c62828', whiteSpace: 'pre-wrap' }}>
-                              {selectedActivo.comentarioBaja}
-                            </Typography>
-                          </Paper>
-                        </Grid>
-                      )}
-                      {assetFiles.formatoBaja && (
-                        <Grid item xs={12} sm={6}>
-                          <Paper
-                            elevation={0}
-                            sx={{
-                              p: 2,
-                              backgroundColor: '#ffebee',
-                              borderRadius: 2,
-                              border: '1px solid #ffcdd2',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                            }}
-                          >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <PdfIcon sx={{ color: '#c62828' }} />
-                              <Box>
-                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#c62828' }}>
-                                  Formato de Baja
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  PDF
-                                </Typography>
-                              </Box>
-                            </Box>
-                            <IconButton
-                              sx={{ color: '#c62828' }}
-                              onClick={() => openFileViewer(assetFiles.formatoBaja, 'pdf', 'Formato de Baja')}
-                              title="Ver Formato de Baja"
-                            >
-                              <ViewIcon />
-                            </IconButton>
-                          </Paper>
-                        </Grid>
-                      )}
                     </>
                   )}
                 </Grid>
@@ -1341,46 +1169,10 @@ export default function BuscarActivosPage() {
                           </Paper>
                         </Grid>
                       )}
-
-                      {assetFiles.formatoAlta && (
-                        <Grid item xs={12} sm={6}>
-                          <Paper
-                            elevation={0}
-                            sx={{
-                              p: 2,
-                              backgroundColor: 'white',
-                              borderRadius: 2,
-                              border: '1px solid #e0e0e0',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                            }}
-                          >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <PdfIcon color="error" />
-                              <Box>
-                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                  Formato de Alta
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  PDF
-                                </Typography>
-                              </Box>
-                            </Box>
-                            <IconButton
-                              color="primary"
-                              onClick={() => openFileViewer(assetFiles.formatoAlta, 'pdf', 'Formato de Alta')}
-                              title="Ver Formato de Alta"
-                            >
-                              <ViewIcon />
-                            </IconButton>
-                          </Paper>
-                        </Grid>
-                      )}
                     </Grid>
 
                     {/* No files message */}
-                    {assetFiles.pictures.length === 0 && !assetFiles.pedimento && !assetFiles.factura && !assetFiles.formatoAlta && !assetFiles.formatoBaja && (
+                    {assetFiles.pictures.length === 0 && !assetFiles.pedimento && !assetFiles.factura && (
                       <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
                         No hay archivos adjuntos para este activo
                       </Typography>
@@ -1412,109 +1204,24 @@ export default function BuscarActivosPage() {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={handleCancelDelete} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ backgroundColor: '#ffebee', color: '#c62828' }}>
-          Confirmar Baja de Activo
-        </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
-          <Typography sx={{ mb: 2 }}>
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+        <DialogTitle>Confirmar Baja de Activo</DialogTitle>
+        <DialogContent>
+          <Typography>
             ¿Está seguro que desea dar de baja el activo{' '}
             <strong>{activoToDelete?.numeroEtiqueta}</strong>?
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
             El activo será marcado como &quot;baja&quot; con la fecha de hoy y no aparecerá en las búsquedas activas.
           </Typography>
-
-          {/* Formato de Baja Upload - Required */}
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-              Formato de Baja (PDF) <span style={{ color: '#c62828' }}>*</span>
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              Es obligatorio subir el formato de baja para continuar.
-            </Typography>
-            
-            {!formatoBajaFile ? (
-              <Button
-                variant="outlined"
-                component="label"
-                startIcon={<PdfIcon />}
-                color="error"
-              >
-                Seleccionar PDF de Formato de Baja
-                <input
-                  type="file"
-                  hidden
-                  accept=".pdf,application/pdf"
-                  onChange={handleFormatoBajaChange}
-                />
-              </Button>
-            ) : (
-              <Box
-                sx={{
-                  p: 2,
-                  border: '1px solid #4caf50',
-                  borderRadius: 2,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  backgroundColor: '#e8f5e9',
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <PdfIcon color="error" />
-                  <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                      {formatoBajaFile.name}
-                    </Typography>
-                    <Chip
-                      label={`${(formatoBajaFile.size / 1024).toFixed(2)} KB`}
-                      size="small"
-                      variant="outlined"
-                    />
-                  </Box>
-                </Box>
-                <IconButton color="error" onClick={handleRemoveFormatoBaja} size="small">
-                  <DeleteIcon />
-                </IconButton>
-              </Box>
-            )}
-          </Box>
-
-          {/* Comentario de Baja - Optional */}
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-              Comentario / Motivo de Baja (Opcional)
-            </Typography>
-            <TextField
-              fullWidth
-              multiline
-              rows={3}
-              placeholder="Ingrese el motivo o comentarios adicionales sobre la baja del activo..."
-              value={comentarioBaja}
-              onChange={(e) => setComentarioBaja(e.target.value)}
-              variant="outlined"
-            />
-          </Box>
-
-          <Divider sx={{ my: 2 }} />
-
-          <Typography variant="body2">
-            Usuario que realiza la baja: <strong>{currentUser?.emp_alias || currentUser?.username || 'N/A'}</strong>
+          <Typography variant="body2" sx={{ mt: 2 }}>
+            Usuario: <strong>{currentUser?.emp_alias || currentUser?.username || 'N/A'}</strong>
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ p: 2, borderTop: '1px solid #e0e0e0' }}>
-          <Button onClick={handleCancelDelete} disabled={deletingAsset}>
-            Cancelar
-          </Button>
-          <Button
-            variant="contained"
-            color="error"
-            onClick={handleDeleteConfirm}
-            disabled={!formatoBajaFile || deletingAsset}
-            startIcon={deletingAsset ? <CircularProgress size={20} color="inherit" /> : <DeleteIcon />}
-          >
-            {deletingAsset ? 'Procesando...' : 'Dar de Baja'}
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancelar</Button>
+          <Button variant="contained" color="error" onClick={handleDeleteConfirm}>
+            Dar de Baja
           </Button>
         </DialogActions>
       </Dialog>
