@@ -13,7 +13,7 @@ export async function POST(request) {
     }
 
     // Proxy the request to the external authentication server
-    const authUrl = 'http://10.56.98.3:5001/PICS_AD/AUTHENTICATE';
+    const authUrl = 'http://10.56.98.3:5001/ASSETS_AD/AUTHENTICATE';
     
     // Create abort controller for timeout
     const controller = new AbortController();
@@ -86,6 +86,14 @@ export async function POST(request) {
       return NextResponse.json(
         { authenticated: false, message: data.message || 'Authentication failed' },
         { status: response.status || 401 }
+      );
+    }
+
+    // Check if user is admin - only admins can login
+    if (!data.isAdmin) {
+      return NextResponse.json(
+        { authenticated: false, message: 'Access denied: Admin privileges required' },
+        { status: 403 }
       );
     }
 
