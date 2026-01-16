@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import * as XLSX from 'xlsx';
 import {
   Box,
   Typography,
@@ -437,6 +438,71 @@ export default function BuscarActivosPage() {
     );
   };
 
+  const handleDownloadExcel = () => {
+    // Prepare data for Excel
+    const excelData = filteredActivos.map((activo) => ({
+      'No. Activo': activo.numeroActivo || '',
+      'No. Etiqueta': activo.numeroEtiqueta || '',
+      'Tipo': activo.tipo_nombre || '',
+      'Marca': activo.marca || '',
+      'Modelo': activo.modelo || '',
+      'Serie': activo.serie || '',
+      'Ubicación': activo.ubicacion_nombre || '',
+      'Planta': activo.planta_nombre || '',
+      'Nacional/Extranjero': activo.nacionalExtranjero || '',
+      'No. Pedimento': activo.numeroPedimento || '',
+      'Fecha Alta': activo.fechaAlta ? new Date(activo.fechaAlta).toLocaleDateString('es-MX') : '',
+      'Usuario Alta': activo.userAlta || '',
+      'No. Capex': activo.numeroCapex || '',
+      'Orden Interna': activo.ordenInterna || '',
+      'Status CIP/FA': activo.statusCipFa || '',
+      'Status': (activo.status || 'activo').toUpperCase(),
+      'Fecha Baja': activo.fechaBaja ? new Date(activo.fechaBaja).toLocaleDateString('es-MX') : '',
+      'Usuario Baja': activo.userBaja || '',
+      'Comentario Baja': activo.comentarioBaja || '',
+      'Observaciones': activo.observaciones || '',
+    }));
+
+    // Create workbook and worksheet
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(excelData);
+
+    // Set column widths
+    const colWidths = [
+      { wch: 15 }, // No. Activo
+      { wch: 15 }, // No. Etiqueta
+      { wch: 20 }, // Tipo
+      { wch: 15 }, // Marca
+      { wch: 15 }, // Modelo
+      { wch: 20 }, // Serie
+      { wch: 20 }, // Ubicación
+      { wch: 15 }, // Planta
+      { wch: 18 }, // Nacional/Extranjero
+      { wch: 20 }, // No. Pedimento
+      { wch: 15 }, // Fecha Alta
+      { wch: 15 }, // Usuario Alta
+      { wch: 15 }, // No. Capex
+      { wch: 15 }, // Orden Interna
+      { wch: 12 }, // Status CIP/FA
+      { wch: 10 }, // Status
+      { wch: 15 }, // Fecha Baja
+      { wch: 15 }, // Usuario Baja
+      { wch: 30 }, // Comentario Baja
+      { wch: 40 }, // Observaciones
+    ];
+    ws['!cols'] = colWidths;
+
+    // Add worksheet to workbook
+    XLSX.utils.book_append_sheet(wb, ws, 'Activos');
+
+    // Generate filename with current date
+    const today = new Date().toISOString().split('T')[0];
+    const filename = `activos_${today}.xlsx`;
+
+    // Download file
+    XLSX.writeFile(wb, filename);
+  };
+
   return (
     <Box>
       <PageBanner
@@ -589,6 +655,17 @@ export default function BuscarActivosPage() {
               Resultados ({filteredActivos.length} activos)
             </Typography>
             <Box sx={{ display: 'flex', gap: 1 }}>
+              <Tooltip title="Descargar Excel">
+                <Button
+                  variant="outlined"
+                  color="success"
+                  startIcon={<DownloadIcon />}
+                  onClick={handleDownloadExcel}
+                  disabled={filteredActivos.length === 0}
+                >
+                  Excel
+                </Button>
+              </Tooltip>
               <Tooltip title="Mostrar/Ocultar Columnas">
                 <Button
                   variant="outlined"
