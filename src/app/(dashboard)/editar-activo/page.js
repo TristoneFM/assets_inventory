@@ -29,6 +29,7 @@ import {
   Visibility as ViewIcon,
   Close as CloseIcon,
   PhotoLibrary as PhotoIcon,
+  AttachFile as AttachFileIcon,
 } from '@mui/icons-material';
 import PageBanner from '@/app/components/PageBanner';
 
@@ -66,6 +67,7 @@ export default function EditarActivoPage() {
   const [newPedimento, setNewPedimento] = useState(null);
   const [newFactura, setNewFactura] = useState(null);
   const [newArchivoAlta, setNewArchivoAlta] = useState(null);
+  const [newExtraFiles, setNewExtraFiles] = useState([]);
 
   // Existing files from server
   const [existingFiles, setExistingFiles] = useState({
@@ -73,6 +75,7 @@ export default function EditarActivoPage() {
     pedimento: null,
     factura: null,
     archivoAlta: null,
+    extraFiles: [],
   });
 
   // Files marked for deletion
@@ -81,6 +84,7 @@ export default function EditarActivoPage() {
     pedimento: false,
     factura: false,
     archivoAlta: false,
+    extraFiles: [],
   });
 
   // Dropdown data from database
@@ -315,6 +319,33 @@ export default function EditarActivoPage() {
     setDeletedFiles(prev => ({ ...prev, archivoAlta: false }));
   };
 
+  // Extra files handling
+  const handleNewExtraFilesChange = (event) => {
+    const files = Array.from(event.target.files);
+    if (files.length > 0) {
+      setNewExtraFiles(prev => [...prev, ...files]);
+    }
+    event.target.value = '';
+  };
+
+  const handleRemoveNewExtraFile = (index) => {
+    setNewExtraFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDeleteExistingExtraFile = (fileUrl) => {
+    setDeletedFiles(prev => ({
+      ...prev,
+      extraFiles: [...prev.extraFiles, fileUrl],
+    }));
+  };
+
+  const handleRestoreExistingExtraFile = (fileUrl) => {
+    setDeletedFiles(prev => ({
+      ...prev,
+      extraFiles: prev.extraFiles.filter(f => f !== fileUrl),
+    }));
+  };
+
   // File viewer
   const openFileViewer = (url, type, title) => {
     setFileViewerUrl(url);
@@ -367,7 +398,7 @@ export default function EditarActivoPage() {
       }
 
       // Upload new files if any
-      if (newPictures.length > 0 || newPedimento || newFactura || newArchivoAlta) {
+      if (newPictures.length > 0 || newPedimento || newFactura || newArchivoAlta || newExtraFiles.length > 0) {
         const uploadData = new FormData();
         uploadData.append('assetId', assetId);
         uploadData.append('numeroEtiqueta', formData.numeroEtiqueta);
@@ -388,6 +419,10 @@ export default function EditarActivoPage() {
           uploadData.append('archivoAlta', newArchivoAlta);
         }
 
+        newExtraFiles.forEach((file) => {
+          uploadData.append('extraFiles', file);
+        });
+
         // Upload files
         await fetch(`/api/activos/${assetId}/upload`, {
           method: 'POST',
@@ -396,7 +431,7 @@ export default function EditarActivoPage() {
       }
 
       // Delete files marked for deletion
-      if (deletedFiles.pictures.length > 0 || deletedFiles.pedimento || deletedFiles.factura || deletedFiles.archivoAlta) {
+      if (deletedFiles.pictures.length > 0 || deletedFiles.pedimento || deletedFiles.factura || deletedFiles.archivoAlta || deletedFiles.extraFiles.length > 0) {
         await fetch(`/api/activos/${assetId}/files`, {
           method: 'DELETE',
           headers: {
@@ -424,7 +459,8 @@ export default function EditarActivoPage() {
       setNewPedimento(null);
       setNewFactura(null);
       setNewArchivoAlta(null);
-      setDeletedFiles({ pictures: [], pedimento: false, factura: false, archivoAlta: false });
+      setNewExtraFiles([]);
+      setDeletedFiles({ pictures: [], pedimento: false, factura: false, archivoAlta: false, extraFiles: [] });
 
     } catch (err) {
       console.error('Error updating asset:', err);
@@ -1178,6 +1214,145 @@ export default function EditarActivoPage() {
                   <IconButton color="error" onClick={handleRemoveNewArchivoAlta}>
                     <DeleteIcon />
                   </IconButton>
+                </Box>
+              )}
+            </Box>
+
+            <Divider sx={{ my: 4 }} />
+
+            {/* Extra Files Section */}
+            <Box sx={{ mb: 4 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                Archivos Extra
+              </Typography>
+
+              {/* Existing Extra Files */}
+              {existingFiles.extraFiles && existingFiles.extraFiles.length > 0 && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                    Archivos existentes:
+                  </Typography>
+                  {existingFiles.extraFiles.map((fileUrl, index) => {
+                    const isDeleted = deletedFiles.extraFiles.includes(fileUrl);
+                    const fileName = fileUrl.split('/').pop();
+                    return (
+                      <Box
+                        key={index}
+                        sx={{
+                          p: 2,
+                          mb: 1,
+                          border: isDeleted ? '2px solid #f44336' : '1px solid #e0e0e0',
+                          borderRadius: 2,
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          backgroundColor: isDeleted ? '#ffebee' : '#f5f5f5',
+                          opacity: isDeleted ? 0.7 : 1,
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <AttachFileIcon color={isDeleted ? 'error' : 'primary'} />
+                          <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
+                            {fileName}
+                          </Typography>
+                          {isDeleted && (
+                            <Chip label="Marcado para eliminar" size="small" color="error" />
+                          )}
+                        </Box>
+                        <Box>
+                          {!isDeleted && (
+                            <>
+                              <IconButton
+                                color="primary"
+                                onClick={() => window.open(fileUrl, '_blank')}
+                                title="Descargar"
+                                size="small"
+                              >
+                                <ViewIcon />
+                              </IconButton>
+                              <IconButton
+                                color="error"
+                                onClick={() => handleDeleteExistingExtraFile(fileUrl)}
+                                title="Eliminar"
+                                size="small"
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </>
+                          )}
+                          {isDeleted && (
+                            <Button
+                              size="small"
+                              color="primary"
+                              onClick={() => handleRestoreExistingExtraFile(fileUrl)}
+                            >
+                              Restaurar
+                            </Button>
+                          )}
+                        </Box>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              )}
+
+              {/* New Extra Files */}
+              <Button
+                variant="outlined"
+                component="label"
+                startIcon={<AttachFileIcon />}
+                sx={{ mb: 2 }}
+              >
+                Agregar Archivos
+                <input
+                  type="file"
+                  hidden
+                  multiple
+                  onChange={handleNewExtraFilesChange}
+                />
+              </Button>
+
+              {newExtraFiles.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="subtitle2" color="primary" sx={{ mb: 1 }}>
+                    Nuevos archivos a subir:
+                  </Typography>
+                  {newExtraFiles.map((file, index) => (
+                    <Box
+                      key={index}
+                      sx={{
+                        p: 2,
+                        mb: 1,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 2,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        backgroundColor: 'action.hover',
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <AttachFileIcon color="primary" />
+                        <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
+                          {file.name}
+                        </Typography>
+                        <Chip
+                          label={`${(file.size / 1024).toFixed(2)} KB`}
+                          size="small"
+                          variant="outlined"
+                        />
+                        <Chip label="Nuevo" size="small" color="primary" />
+                      </Box>
+                      <IconButton
+                        color="error"
+                        onClick={() => handleRemoveNewExtraFile(index)}
+                        size="small"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Box>
+                  ))}
                 </Box>
               )}
             </Box>

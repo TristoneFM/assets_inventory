@@ -59,6 +59,7 @@ export async function POST(request) {
     const pedimentoFile = formData.get('pedimento');
     const facturaFile = formData.get('factura');
     const archivoAltaFile = formData.get('archivoAlta');
+    const extraFiles = formData.getAll('extraFiles');
 
     // Validate required fields
     if (!assetData.numeroActivo || !assetData.numeroEtiqueta || !assetData.tipo_id ||
@@ -103,6 +104,7 @@ export async function POST(request) {
       pedimento: null,
       factura: null,
       archivoAlta: null,
+      extraFiles: [],
     };
 
     // Save asset pictures
@@ -135,6 +137,18 @@ export async function POST(request) {
       const ext = getFileExtension(archivoAltaFile.name);
       const filename = `${filePrefix}_archivo_alta.${ext}`;
       savedFiles.archivoAlta = await saveFile(archivoAltaFile, 'archivos_alta', filename);
+    }
+
+    // Save extra files
+    for (let i = 0; i < extraFiles.length; i++) {
+      const file = extraFiles[i];
+      if (file && file.size > 0) {
+        const ext = getFileExtension(file.name);
+        const originalName = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+        const filename = `${filePrefix}_extra_${i + 1}_${originalName}.${ext}`;
+        const savedPath = await saveFile(file, 'extras', filename);
+        savedFiles.extraFiles.push(savedPath);
+      }
     }
 
     console.log('Files saved:', savedFiles);

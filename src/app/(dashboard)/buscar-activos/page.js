@@ -50,6 +50,7 @@ import {
   PhotoLibrary as PhotoIcon,
   Download as DownloadIcon,
   ViewColumn as ViewColumnIcon,
+  AttachFile as AttachFileIcon,
 } from '@mui/icons-material';
 import PageBanner from '@/app/components/PageBanner';
 
@@ -84,7 +85,7 @@ export default function BuscarActivosPage() {
   // View dialog
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedActivo, setSelectedActivo] = useState(null);
-  const [assetFiles, setAssetFiles] = useState({ pictures: [], pedimento: null, factura: null, archivoAlta: null, archivoBaja: null });
+  const [assetFiles, setAssetFiles] = useState({ pictures: [], pedimento: null, factura: null, archivoAlta: null, archivoBaja: null, extraFiles: [] });
   const [loadingFiles, setLoadingFiles] = useState(false);
 
   // File viewer modal
@@ -1294,8 +1295,56 @@ export default function BuscarActivosPage() {
                       )}
                     </Grid>
 
+                    {/* Extra Files */}
+                    {assetFiles.extraFiles && assetFiles.extraFiles.length > 0 && (
+                      <Box sx={{ mt: 3 }}>
+                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                          Archivos Extra ({assetFiles.extraFiles.length})
+                        </Typography>
+                        <Grid container spacing={2}>
+                          {assetFiles.extraFiles.map((fileUrl, index) => {
+                            const fileName = fileUrl.split('/').pop();
+                            return (
+                              <Grid item xs={12} sm={6} key={index}>
+                                <Paper
+                                  elevation={0}
+                                  sx={{
+                                    p: 2,
+                                    backgroundColor: 'white',
+                                    borderRadius: 2,
+                                    border: '1px solid #e0e0e0',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                  }}
+                                >
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, overflow: 'hidden' }}>
+                                    <AttachFileIcon color="primary" />
+                                    <Box sx={{ overflow: 'hidden' }}>
+                                      <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
+                                        {fileName}
+                                      </Typography>
+                                    </Box>
+                                  </Box>
+                                  <IconButton
+                                    color="primary"
+                                    component="a"
+                                    href={fileUrl}
+                                    download
+                                    title="Descargar"
+                                  >
+                                    <DownloadIcon />
+                                  </IconButton>
+                                </Paper>
+                              </Grid>
+                            );
+                          })}
+                        </Grid>
+                      </Box>
+                    )}
+
                     {/* No files message */}
-                    {assetFiles.pictures.length === 0 && !assetFiles.pedimento && !assetFiles.factura && !assetFiles.archivoAlta && !assetFiles.archivoBaja && (
+                    {assetFiles.pictures.length === 0 && !assetFiles.pedimento && !assetFiles.factura && !assetFiles.archivoAlta && !assetFiles.archivoBaja && (!assetFiles.extraFiles || assetFiles.extraFiles.length === 0) && (
                       <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
                         No hay archivos adjuntos para este activo
                       </Typography>

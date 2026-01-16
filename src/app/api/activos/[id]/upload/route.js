@@ -47,6 +47,24 @@ async function getNextPictureIndex(filePrefix) {
   }
 }
 
+// Get the next available index for extra files
+async function getNextExtraIndex(filePrefix) {
+  try {
+    const extrasDir = path.join(process.cwd(), 'public', 'uploads', 'extras');
+    const files = await readdir(extrasDir);
+    const existingIndexes = files
+      .filter(f => f.startsWith(`${filePrefix}_extra_`))
+      .map(f => {
+        const match = f.match(/_extra_(\d+)_/);
+        return match ? parseInt(match[1]) : 0;
+      });
+    
+    return existingIndexes.length > 0 ? Math.max(...existingIndexes) + 1 : 1;
+  } catch {
+    return 1;
+  }
+}
+
 export async function POST(request, { params }) {
   try {
     const { id } = params;
@@ -60,6 +78,7 @@ export async function POST(request, { params }) {
       pedimento: null,
       factura: null,
       archivoAlta: null,
+      extraFiles: [],
     };
 
     // Get starting index for new pictures
@@ -99,6 +118,21 @@ export async function POST(request, { params }) {
       const ext = getFileExtension(archivoAltaFile.name);
       const filename = `${filePrefix}_archivo_alta.${ext}`;
       savedFiles.archivoAlta = await saveFile(archivoAltaFile, 'archivos_alta', filename);
+    }
+
+    // Save extra files
+    const extraFiles = formData.getAll('extraFiles');
+    // Get starting index for extra files
+    let extraIndex = await getNextExtraIndex(filePrefix);
+    for (const file of extraFiles) {
+      if (file && file.size > 0) {
+        const ext = getFileExtension(file.name);
+        const originalName = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+        const filename = `${filePrefix}_extra_${extraIndex}_${originalName}.${ext}`;
+        const savedPath = await saveFile(file, 'extras', filename);
+        savedFiles.extraFiles.push(savedPath);
+        extraIndex++;
+      }
     }
 
     return NextResponse.json({

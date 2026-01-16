@@ -41,6 +41,7 @@ export async function GET(request, { params }) {
       factura: null,
       archivoAlta: null,
       archivoBaja: null,
+      extraFiles: [],
     };
 
     // Scan pictures folder
@@ -104,6 +105,18 @@ export async function GET(request, { params }) {
       console.log('No archivos_baja directory or empty');
     }
 
+    // Scan extras folder
+    try {
+      const extrasDir = path.join(process.cwd(), 'public', 'uploads', 'extras');
+      const extraFilesList = await readdir(extrasDir);
+      files.extraFiles = extraFilesList
+        .filter(file => file.startsWith(`${filePrefix}_extra_`) && !file.startsWith('.'))
+        .map(file => `/uploads/extras/${file}`)
+        .sort();
+    } catch (err) {
+      console.log('No extras directory or empty');
+    }
+
     return NextResponse.json({
       success: true,
       data: files,
@@ -121,7 +134,7 @@ export async function DELETE(request, { params }) {
   try {
     const { id } = params;
     const body = await request.json();
-    const { pictures = [], pedimento = false, factura = false, archivoAlta = false } = body;
+    const { pictures = [], pedimento = false, factura = false, archivoAlta = false, extraFiles = [] } = body;
 
     const deletedFiles = [];
 
@@ -213,6 +226,18 @@ export async function DELETE(request, { params }) {
         } catch (err) {
           console.error('Error deleting archivo alta:', err);
         }
+      }
+    }
+
+    // Delete specified extra files
+    for (const fileUrl of extraFiles) {
+      try {
+        const filename = fileUrl.split('/').pop();
+        const filePath = path.join(process.cwd(), 'public', 'uploads', 'extras', filename);
+        await unlink(filePath);
+        deletedFiles.push(fileUrl);
+      } catch (err) {
+        console.error(`Error deleting extra file ${fileUrl}:`, err);
       }
     }
 

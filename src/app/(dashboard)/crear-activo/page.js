@@ -24,6 +24,7 @@ import {
   Description as DescriptionIcon,
   Delete as DeleteIcon,
   PictureAsPdf as PdfIcon,
+  AttachFile as AttachFileIcon,
 } from '@mui/icons-material';
 import PageBanner from '@/app/components/PageBanner';
 
@@ -55,6 +56,7 @@ export default function CrearActivoPage() {
   const [pedimentoFile, setPedimentoFile] = useState(null);
   const [facturaFile, setFacturaFile] = useState(null);
   const [archivoAltaFile, setArchivoAltaFile] = useState(null);
+  const [extraFiles, setExtraFiles] = useState([]);
 
   // Dropdown data from database
   const [plantas, setPlantas] = useState([]);
@@ -168,6 +170,18 @@ export default function CrearActivoPage() {
     setArchivoAltaFile(null);
   };
 
+  const handleExtraFilesChange = (event) => {
+    const files = Array.from(event.target.files);
+    if (files.length > 0) {
+      setExtraFiles(prev => [...prev, ...files]);
+    }
+    event.target.value = '';
+  };
+
+  const handleRemoveExtraFile = (index) => {
+    setExtraFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
@@ -206,6 +220,11 @@ export default function CrearActivoPage() {
       if (archivoAltaFile) {
         submitData.append('archivoAlta', archivoAltaFile);
       }
+
+      // Add extra files
+      extraFiles.forEach((file) => {
+        submitData.append('extraFiles', file);
+      });
 
       // TODO: Replace with actual API call
       const response = await fetch('/api/activos', {
@@ -250,6 +269,7 @@ export default function CrearActivoPage() {
       setPedimentoFile(null);
       setFacturaFile(null);
       setArchivoAltaFile(null);
+      setExtraFiles([]);
 
       // Optionally redirect after a delay
       // setTimeout(() => router.push('/buscar-activos'), 2000);
@@ -779,6 +799,73 @@ export default function CrearActivoPage() {
                   >
                     <DeleteIcon />
                   </IconButton>
+                </Box>
+              )}
+            </Box>
+
+            <Divider sx={{ my: 4 }} />
+
+            {/* Extra Files Section */}
+            <Box sx={{ mb: 4 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                Archivos Extra
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Puede adjuntar archivos adicionales de cualquier tipo (Opcional)
+              </Typography>
+              
+              <Button
+                variant="outlined"
+                component="label"
+                startIcon={<AttachFileIcon />}
+                sx={{ mb: 2 }}
+              >
+                Agregar Archivos
+                <input
+                  type="file"
+                  hidden
+                  multiple
+                  onChange={handleExtraFilesChange}
+                />
+              </Button>
+
+              {extraFiles.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  {extraFiles.map((file, index) => (
+                    <Box
+                      key={index}
+                      sx={{
+                        p: 2,
+                        mb: 1,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 2,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        backgroundColor: 'action.hover',
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <AttachFileIcon color="primary" />
+                        <Typography variant="body1" sx={{ fontWeight: 500 }} noWrap>
+                          {file.name}
+                        </Typography>
+                        <Chip
+                          label={`${(file.size / 1024).toFixed(2)} KB`}
+                          size="small"
+                          variant="outlined"
+                        />
+                      </Box>
+                      <IconButton
+                        color="error"
+                        onClick={() => handleRemoveExtraFile(index)}
+                        size="small"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Box>
+                  ))}
                 </Box>
               )}
             </Box>
