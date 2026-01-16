@@ -65,12 +65,14 @@ export default function EditarActivoPage() {
   const [newPictures, setNewPictures] = useState([]);
   const [newPedimento, setNewPedimento] = useState(null);
   const [newFactura, setNewFactura] = useState(null);
+  const [newArchivoAlta, setNewArchivoAlta] = useState(null);
 
   // Existing files from server
   const [existingFiles, setExistingFiles] = useState({
     pictures: [],
     pedimento: null,
     factura: null,
+    archivoAlta: null,
   });
 
   // Files marked for deletion
@@ -78,6 +80,7 @@ export default function EditarActivoPage() {
     pictures: [],
     pedimento: false,
     factura: false,
+    archivoAlta: false,
   });
 
   // Dropdown data from database
@@ -289,6 +292,29 @@ export default function EditarActivoPage() {
     setDeletedFiles(prev => ({ ...prev, factura: false }));
   };
 
+  // Archivo Alta handling
+  const handleNewArchivoAltaChange = (event) => {
+    const file = event.target.files[0];
+    if (file && file.type === 'application/pdf') {
+      setNewArchivoAlta(file);
+    } else {
+      setError('Por favor seleccione un archivo PDF');
+    }
+    event.target.value = '';
+  };
+
+  const handleRemoveNewArchivoAlta = () => {
+    setNewArchivoAlta(null);
+  };
+
+  const handleDeleteExistingArchivoAlta = () => {
+    setDeletedFiles(prev => ({ ...prev, archivoAlta: true }));
+  };
+
+  const handleRestoreExistingArchivoAlta = () => {
+    setDeletedFiles(prev => ({ ...prev, archivoAlta: false }));
+  };
+
   // File viewer
   const openFileViewer = (url, type, title) => {
     setFileViewerUrl(url);
@@ -341,7 +367,7 @@ export default function EditarActivoPage() {
       }
 
       // Upload new files if any
-      if (newPictures.length > 0 || newPedimento || newFactura) {
+      if (newPictures.length > 0 || newPedimento || newFactura || newArchivoAlta) {
         const uploadData = new FormData();
         uploadData.append('assetId', assetId);
         uploadData.append('numeroEtiqueta', formData.numeroEtiqueta);
@@ -358,6 +384,10 @@ export default function EditarActivoPage() {
           uploadData.append('factura', newFactura);
         }
 
+        if (newArchivoAlta) {
+          uploadData.append('archivoAlta', newArchivoAlta);
+        }
+
         // Upload files
         await fetch(`/api/activos/${assetId}/upload`, {
           method: 'POST',
@@ -366,7 +396,7 @@ export default function EditarActivoPage() {
       }
 
       // Delete files marked for deletion
-      if (deletedFiles.pictures.length > 0 || deletedFiles.pedimento || deletedFiles.factura) {
+      if (deletedFiles.pictures.length > 0 || deletedFiles.pedimento || deletedFiles.factura || deletedFiles.archivoAlta) {
         await fetch(`/api/activos/${assetId}/files`, {
           method: 'DELETE',
           headers: {
@@ -393,7 +423,8 @@ export default function EditarActivoPage() {
       setNewPictures([]);
       setNewPedimento(null);
       setNewFactura(null);
-      setDeletedFiles({ pictures: [], pedimento: false, factura: false });
+      setNewArchivoAlta(null);
+      setDeletedFiles({ pictures: [], pedimento: false, factura: false, archivoAlta: false });
 
     } catch (err) {
       console.error('Error updating asset:', err);
@@ -1040,6 +1071,111 @@ export default function EditarActivoPage() {
                     </Box>
                   </Box>
                   <IconButton color="error" onClick={handleRemoveNewFactura}>
+                    <DeleteIcon />
+                  </IconButton>
+                </Box>
+              )}
+            </Box>
+
+            <Divider sx={{ my: 4 }} />
+
+            {/* Archivo Alta Section */}
+            <Box sx={{ mb: 4 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                Archivo de Alta (PDF)
+              </Typography>
+
+              {/* Existing Archivo Alta */}
+              {existingFiles.archivoAlta && !deletedFiles.archivoAlta && (
+                <Box
+                  sx={{
+                    p: 2,
+                    border: '1px solid #e0e0e0',
+                    borderRadius: 2,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: '#f5f5f5',
+                    mb: 2,
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <PdfIcon color="error" />
+                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                      Archivo de Alta existente
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <IconButton
+                      color="primary"
+                      onClick={() => openFileViewer(existingFiles.archivoAlta, 'pdf', 'Archivo de Alta')}
+                      title="Ver"
+                    >
+                      <ViewIcon />
+                    </IconButton>
+                    <IconButton
+                      color="error"
+                      onClick={handleDeleteExistingArchivoAlta}
+                      title="Eliminar"
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </Box>
+                </Box>
+              )}
+
+              {existingFiles.archivoAlta && deletedFiles.archivoAlta && (
+                <Alert
+                  severity="warning"
+                  sx={{ mb: 2 }}
+                  action={
+                    <Button color="inherit" size="small" onClick={handleRestoreExistingArchivoAlta}>
+                      Restaurar
+                    </Button>
+                  }
+                >
+                  Archivo de Alta marcado para eliminar
+                </Alert>
+              )}
+
+              {/* New Archivo Alta */}
+              {!newArchivoAlta ? (
+                <Button
+                  variant="outlined"
+                  component="label"
+                  startIcon={<PdfIcon />}
+                >
+                  {existingFiles.archivoAlta ? 'Reemplazar Archivo de Alta' : 'Subir Archivo de Alta'}
+                  <input
+                    type="file"
+                    hidden
+                    accept=".pdf,application/pdf"
+                    onChange={handleNewArchivoAltaChange}
+                  />
+                </Button>
+              ) : (
+                <Box
+                  sx={{
+                    p: 2,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: 'action.hover',
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <PdfIcon color="error" />
+                    <Box>
+                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                        {newArchivoAlta.name}
+                      </Typography>
+                      <Chip label="Nuevo" size="small" color="primary" />
+                    </Box>
+                  </Box>
+                  <IconButton color="error" onClick={handleRemoveNewArchivoAlta}>
                     <DeleteIcon />
                   </IconButton>
                 </Box>

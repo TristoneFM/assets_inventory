@@ -39,6 +39,8 @@ export async function GET(request, { params }) {
       pictures: [],
       pedimento: null,
       factura: null,
+      archivoAlta: null,
+      archivoBaja: null,
     };
 
     // Scan pictures folder
@@ -78,6 +80,30 @@ export async function GET(request, { params }) {
       console.log('No facturas directory or empty');
     }
 
+    // Scan archivos_alta folder
+    try {
+      const archivosAltaDir = path.join(process.cwd(), 'public', 'uploads', 'archivos_alta');
+      const archivoAltaFiles = await readdir(archivosAltaDir);
+      const archivoAltaFile = archivoAltaFiles.find(file => file.startsWith(`${filePrefix}_archivo_alta`));
+      if (archivoAltaFile) {
+        files.archivoAlta = `/uploads/archivos_alta/${archivoAltaFile}`;
+      }
+    } catch (err) {
+      console.log('No archivos_alta directory or empty');
+    }
+
+    // Scan archivos_baja folder
+    try {
+      const archivosBajaDir = path.join(process.cwd(), 'public', 'uploads', 'archivos_baja');
+      const archivoBajaFiles = await readdir(archivosBajaDir);
+      const archivoBajaFile = archivoBajaFiles.find(file => file.startsWith(`${filePrefix}_archivo_baja`));
+      if (archivoBajaFile) {
+        files.archivoBaja = `/uploads/archivos_baja/${archivoBajaFile}`;
+      }
+    } catch (err) {
+      console.log('No archivos_baja directory or empty');
+    }
+
     return NextResponse.json({
       success: true,
       data: files,
@@ -95,7 +121,7 @@ export async function DELETE(request, { params }) {
   try {
     const { id } = params;
     const body = await request.json();
-    const { pictures = [], pedimento = false, factura = false } = body;
+    const { pictures = [], pedimento = false, factura = false, archivoAlta = false } = body;
 
     const deletedFiles = [];
 
@@ -160,6 +186,32 @@ export async function DELETE(request, { params }) {
           }
         } catch (err) {
           console.error('Error deleting factura:', err);
+        }
+      }
+    }
+
+    // Delete archivoAlta if requested
+    if (archivoAlta) {
+      const assets = await query(
+        'SELECT numeroEtiqueta FROM activos WHERE id = ?',
+        [id]
+      );
+
+      if (assets && assets.length > 0) {
+        const filePrefix = sanitizeFilename(assets[0].numeroEtiqueta);
+        
+        try {
+          const archivosAltaDir = path.join(process.cwd(), 'public', 'uploads', 'archivos_alta');
+          const archivoAltaFiles = await readdir(archivosAltaDir);
+          const archivoAltaFile = archivoAltaFiles.find(file => file.startsWith(`${filePrefix}_archivo_alta`));
+          
+          if (archivoAltaFile) {
+            const filePath = path.join(archivosAltaDir, archivoAltaFile);
+            await unlink(filePath);
+            deletedFiles.push(`/uploads/archivos_alta/${archivoAltaFile}`);
+          }
+        } catch (err) {
+          console.error('Error deleting archivo alta:', err);
         }
       }
     }

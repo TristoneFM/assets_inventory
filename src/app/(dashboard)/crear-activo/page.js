@@ -54,6 +54,7 @@ export default function CrearActivoPage() {
   const [assetPictures, setAssetPictures] = useState([]);
   const [pedimentoFile, setPedimentoFile] = useState(null);
   const [facturaFile, setFacturaFile] = useState(null);
+  const [archivoAltaFile, setArchivoAltaFile] = useState(null);
 
   // Dropdown data from database
   const [plantas, setPlantas] = useState([]);
@@ -153,6 +154,20 @@ export default function CrearActivoPage() {
     setFacturaFile(null);
   };
 
+  const handleArchivoAltaChange = (event) => {
+    const file = event.target.files[0];
+    if (file && file.type === 'application/pdf') {
+      setArchivoAltaFile(file);
+    } else {
+      setError('Por favor seleccione un archivo PDF para el archivo de alta');
+    }
+    event.target.value = '';
+  };
+
+  const handleRemoveArchivoAlta = () => {
+    setArchivoAltaFile(null);
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
@@ -185,6 +200,11 @@ export default function CrearActivoPage() {
       // Add factura file if exists
       if (facturaFile) {
         submitData.append('factura', facturaFile);
+      }
+
+      // Add archivo de alta if exists
+      if (archivoAltaFile) {
+        submitData.append('archivoAlta', archivoAltaFile);
       }
 
       // TODO: Replace with actual API call
@@ -229,6 +249,7 @@ export default function CrearActivoPage() {
       setAssetPictures([]);
       setPedimentoFile(null);
       setFacturaFile(null);
+      setArchivoAltaFile(null);
 
       // Optionally redirect after a delay
       // setTimeout(() => router.push('/buscar-activos'), 2000);
@@ -692,6 +713,68 @@ export default function CrearActivoPage() {
                   <IconButton
                     color="error"
                     onClick={handleRemoveFactura}
+                    size="small"
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                </Box>
+              )}
+            </Box>
+
+            <Divider sx={{ my: 4 }} />
+
+            {/* Archivo de Alta PDF Section - OPTIONAL */}
+            <Box sx={{ mb: 4 }}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                Archivo de Alta (PDF)
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Suba el archivo PDF del documento de alta del activo (Opcional)
+              </Typography>
+              
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                <Button
+                  variant="outlined"
+                  component="label"
+                  startIcon={<PdfIcon />}
+                >
+                  Seleccionar PDF de Alta
+                  <input
+                    type="file"
+                    hidden
+                    accept=".pdf,application/pdf"
+                    onChange={handleArchivoAltaChange}
+                  />
+                </Button>
+              </Box>
+
+              {archivoAltaFile && (
+                <Box
+                  sx={{
+                    p: 2,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: 'action.hover',
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <PdfIcon color="error" />
+                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                      {archivoAltaFile.name}
+                    </Typography>
+                    <Chip
+                      label={`${(archivoAltaFile.size / 1024).toFixed(2)} KB`}
+                      size="small"
+                      variant="outlined"
+                    />
+                  </Box>
+                  <IconButton
+                    color="error"
+                    onClick={handleRemoveArchivoAlta}
                     size="small"
                   >
                     <DeleteIcon />

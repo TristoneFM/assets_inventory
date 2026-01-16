@@ -59,6 +59,7 @@ export async function POST(request, { params }) {
       pictures: [],
       pedimento: null,
       factura: null,
+      archivoAlta: null,
     };
 
     // Get starting index for new pictures
@@ -90,6 +91,14 @@ export async function POST(request, { params }) {
       const ext = getFileExtension(facturaFile.name);
       const filename = `${filePrefix}_factura.${ext}`;
       savedFiles.factura = await saveFile(facturaFile, 'facturas', filename);
+    }
+
+    // Save archivo de alta
+    const archivoAltaFile = formData.get('archivoAlta');
+    if (archivoAltaFile && archivoAltaFile.size > 0) {
+      const ext = getFileExtension(archivoAltaFile.name);
+      const filename = `${filePrefix}_archivo_alta.${ext}`;
+      savedFiles.archivoAlta = await saveFile(archivoAltaFile, 'archivos_alta', filename);
     }
 
     return NextResponse.json({

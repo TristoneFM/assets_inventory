@@ -84,7 +84,7 @@ export default function BuscarActivosPage() {
   // View dialog
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedActivo, setSelectedActivo] = useState(null);
-  const [assetFiles, setAssetFiles] = useState({ pictures: [], pedimento: null, factura: null });
+  const [assetFiles, setAssetFiles] = useState({ pictures: [], pedimento: null, factura: null, archivoAlta: null, archivoBaja: null });
   const [loadingFiles, setLoadingFiles] = useState(false);
 
   // File viewer modal
@@ -109,6 +109,9 @@ export default function BuscarActivosPage() {
   // Delete dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [activoToDelete, setActivoToDelete] = useState(null);
+  const [archivoBajaFile, setArchivoBajaFile] = useState(null);
+  const [comentarioBaja, setComentarioBaja] = useState('');
+  const [deleteError, setDeleteError] = useState('');
 
   // Current logged-in user
   const [currentUser, setCurrentUser] = useState(null);
@@ -350,19 +353,43 @@ export default function BuscarActivosPage() {
     setDeleteDialogOpen(true);
   };
 
+  const handleArchivoBajaChange = (event) => {
+    const file = event.target.files[0];
+    if (file && file.type === 'application/pdf') {
+      setArchivoBajaFile(file);
+      setDeleteError('');
+    } else {
+      setDeleteError('Por favor seleccione un archivo PDF');
+    }
+    event.target.value = '';
+  };
+
+  const handleRemoveArchivoBaja = () => {
+    setArchivoBajaFile(null);
+  };
+
   const handleDeleteConfirm = async () => {
     if (!activoToDelete) return;
+
+    // Validate required file
+    if (!archivoBajaFile) {
+      setDeleteError('El archivo de baja es obligatorio');
+      return;
+    }
 
     // Get userBaja from logged-in user
     const userBaja = currentUser?.emp_alias || currentUser?.username || 'unknown';
 
     try {
-      const response = await fetch(`/api/activos/${activoToDelete.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userBaja }),
+      // Use FormData to send file
+      const formData = new FormData();
+      formData.append('userBaja', userBaja);
+      formData.append('comentarioBaja', comentarioBaja);
+      formData.append('archivoBaja', archivoBajaFile);
+
+      const response = await fetch(`/api/activos/${activoToDelete.id}/baja`, {
+        method: 'POST',
+        body: formData,
       });
 
       const data = await response.json();
@@ -370,16 +397,28 @@ export default function BuscarActivosPage() {
       if (data.success) {
         setSuccess('Activo dado de baja exitosamente');
         fetchData();
+        // Reset form
+        setArchivoBajaFile(null);
+        setComentarioBaja('');
+        setDeleteError('');
       } else {
-        setError(data.message || 'Error al dar de baja el activo');
+        setDeleteError(data.message || 'Error al dar de baja el activo');
       }
     } catch (err) {
       console.error('Error deleting asset:', err);
-      setError('Error de conexión');
+      setDeleteError('Error de conexión');
     } finally {
       setDeleteDialogOpen(false);
       setActivoToDelete(null);
     }
+  };
+
+  const handleCloseDeleteDialog = () => {
+    setDeleteDialogOpen(false);
+    setActivoToDelete(null);
+    setArchivoBajaFile(null);
+    setComentarioBaja('');
+    setDeleteError('');
   };
 
   const getStatusChip = (status) => {
@@ -390,7 +429,7 @@ export default function BuscarActivosPage() {
     };
     return (
       <Chip
-        label={status || 'activo'}
+        label={(status || 'activo').toUpperCase()}
         color={statusColors[status] || 'default'}
         size="small"
       />
@@ -1024,6 +1063,18 @@ export default function BuscarActivosPage() {
                           </Typography>
                         </Paper>
                       </Grid>
+                      {selectedActivo.comentarioBaja && (
+                        <Grid item xs={12}>
+                          <Paper elevation={0} sx={{ p: 2, backgroundColor: '#ffebee', borderRadius: 2, border: '1px solid #ffcdd2' }}>
+                            <Typography variant="caption" color="error" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                              Comentario de Baja
+                            </Typography>
+                            <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5, color: '#c62828', whiteSpace: 'pre-wrap' }}>
+                              {selectedActivo.comentarioBaja}
+                            </Typography>
+                          </Paper>
+                        </Grid>
+                      )}
                     </>
                   )}
                 </Grid>
@@ -1169,10 +1220,82 @@ export default function BuscarActivosPage() {
                           </Paper>
                         </Grid>
                       )}
+
+                      {assetFiles.archivoAlta && (
+                        <Grid item xs={12} sm={6}>
+                          <Paper
+                            elevation={0}
+                            sx={{
+                              p: 2,
+                              backgroundColor: 'white',
+                              borderRadius: 2,
+                              border: '1px solid #e0e0e0',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <PdfIcon color="error" />
+                              <Box>
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                  Archivo de Alta
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  PDF
+                                </Typography>
+                              </Box>
+                            </Box>
+                            <IconButton
+                              color="primary"
+                              onClick={() => openFileViewer(assetFiles.archivoAlta, 'pdf', 'Archivo de Alta')}
+                              title="Ver Archivo de Alta"
+                            >
+                              <ViewIcon />
+                            </IconButton>
+                          </Paper>
+                        </Grid>
+                      )}
+
+                      {assetFiles.archivoBaja && (
+                        <Grid item xs={12} sm={6}>
+                          <Paper
+                            elevation={0}
+                            sx={{
+                              p: 2,
+                              backgroundColor: '#ffebee',
+                              borderRadius: 2,
+                              border: '1px solid #ffcdd2',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <PdfIcon color="error" />
+                              <Box>
+                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#c62828' }}>
+                                  Archivo de Baja
+                                </Typography>
+                                <Typography variant="caption" color="error">
+                                  PDF
+                                </Typography>
+                              </Box>
+                            </Box>
+                            <IconButton
+                              color="error"
+                              onClick={() => openFileViewer(assetFiles.archivoBaja, 'pdf', 'Archivo de Baja')}
+                              title="Ver Archivo de Baja"
+                            >
+                              <ViewIcon />
+                            </IconButton>
+                          </Paper>
+                        </Grid>
+                      )}
                     </Grid>
 
                     {/* No files message */}
-                    {assetFiles.pictures.length === 0 && !assetFiles.pedimento && !assetFiles.factura && (
+                    {assetFiles.pictures.length === 0 && !assetFiles.pedimento && !assetFiles.factura && !assetFiles.archivoAlta && !assetFiles.archivoBaja && (
                       <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
                         No hay archivos adjuntos para este activo
                       </Typography>
@@ -1204,7 +1327,7 @@ export default function BuscarActivosPage() {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+      <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog} maxWidth="sm" fullWidth>
         <DialogTitle>Confirmar Baja de Activo</DialogTitle>
         <DialogContent>
           <Typography>
@@ -1217,10 +1340,97 @@ export default function BuscarActivosPage() {
           <Typography variant="body2" sx={{ mt: 2 }}>
             Usuario: <strong>{currentUser?.emp_alias || currentUser?.username || 'N/A'}</strong>
           </Typography>
+
+          {deleteError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {deleteError}
+            </Alert>
+          )}
+
+          <Divider sx={{ my: 3 }} />
+
+          {/* Archivo de Baja - Required */}
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+            Archivo de Baja (PDF) <Chip label="Obligatorio" size="small" color="error" sx={{ ml: 1 }} />
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Suba el archivo PDF del documento de baja del activo
+          </Typography>
+          
+          <Box sx={{ mb: 2 }}>
+            <Button
+              variant="outlined"
+              component="label"
+              startIcon={<PdfIcon />}
+              color={!archivoBajaFile ? 'error' : 'primary'}
+              fullWidth
+            >
+              {archivoBajaFile ? 'Cambiar PDF de Baja' : 'Seleccionar PDF de Baja'}
+              <input
+                type="file"
+                hidden
+                accept=".pdf,application/pdf"
+                onChange={handleArchivoBajaChange}
+              />
+            </Button>
+          </Box>
+
+          {archivoBajaFile && (
+            <Box
+              sx={{
+                p: 2,
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 2,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: 'action.hover',
+                mb: 3,
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <PdfIcon color="error" />
+                <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
+                  {archivoBajaFile.name}
+                </Typography>
+                <Chip
+                  label={`${(archivoBajaFile.size / 1024).toFixed(2)} KB`}
+                  size="small"
+                  variant="outlined"
+                />
+              </Box>
+              <IconButton
+                color="error"
+                onClick={handleRemoveArchivoBaja}
+                size="small"
+              >
+                <DeleteIcon />
+              </IconButton>
+            </Box>
+          )}
+
+          {/* Comentario de Baja */}
+          <TextField
+            fullWidth
+            label="Comentario de Baja"
+            placeholder="Ingrese el motivo o comentarios sobre la baja del activo"
+            multiline
+            rows={3}
+            value={comentarioBaja}
+            onChange={(e) => setComentarioBaja(e.target.value)}
+            variant="outlined"
+            sx={{ mt: 2 }}
+          />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>Cancelar</Button>
-          <Button variant="contained" color="error" onClick={handleDeleteConfirm}>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={handleCloseDeleteDialog}>Cancelar</Button>
+          <Button 
+            variant="contained" 
+            color="error" 
+            onClick={handleDeleteConfirm}
+            disabled={!archivoBajaFile}
+          >
             Dar de Baja
           </Button>
         </DialogActions>

@@ -58,6 +58,7 @@ export async function POST(request) {
     const assetPictures = formData.getAll('assetPictures');
     const pedimentoFile = formData.get('pedimento');
     const facturaFile = formData.get('factura');
+    const archivoAltaFile = formData.get('archivoAlta');
 
     // Validate required fields
     if (!assetData.numeroActivo || !assetData.numeroEtiqueta || !assetData.tipo_id ||
@@ -101,6 +102,7 @@ export async function POST(request) {
       pictures: [],
       pedimento: null,
       factura: null,
+      archivoAlta: null,
     };
 
     // Save asset pictures
@@ -126,6 +128,13 @@ export async function POST(request) {
       const ext = getFileExtension(facturaFile.name);
       const filename = `${filePrefix}_factura.${ext}`;
       savedFiles.factura = await saveFile(facturaFile, 'facturas', filename);
+    }
+
+    // Save archivo de alta PDF (optional)
+    if (archivoAltaFile && archivoAltaFile.size > 0) {
+      const ext = getFileExtension(archivoAltaFile.name);
+      const filename = `${filePrefix}_archivo_alta.${ext}`;
+      savedFiles.archivoAlta = await saveFile(archivoAltaFile, 'archivos_alta', filename);
     }
 
     console.log('Files saved:', savedFiles);
